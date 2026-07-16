@@ -52,7 +52,9 @@ module.exports = {
 
     if (msgVendaAutorizada) {
       const rawTexto = JSON.stringify(msgVendaAutorizada.components || []);
-      const compradorExistente = rawTexto.match(/"<@(\d+)>"/)?.[1];
+      // Procura "Comprador: <@id>" no texto serializado
+      const compradorExistente = rawTexto.match(/Comprador[^"]*<@(\d+)>/)?.[1]
+        || rawTexto.match(/<@(\d+)>/)?.[1];
       if (compradorExistente !== comprador.id) {
         return interaction.reply({
           content:
