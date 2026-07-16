@@ -42,6 +42,7 @@ module.exports = {
     const { carro, infoAlt, seta, dot, rpc2, rpw } = e || {};
 
     const moneyEmoji = '<:MoneyGVRPNL:1235408784155869205>';
+    const gvnlEmoji  = '<:GVNL:1391202082920595556>';
     const valorDisplay = valorFormatado.replace('$', '');
     const msgPayload = {
       flags: MessageFlags.IsComponentsV2,
@@ -52,7 +53,8 @@ module.exports = {
           {
             type: 10,
             content:
-              `# ${moneyEmoji} ${valorDisplay}\n` +
+              `${gvnlEmoji} **Roadmap Resale Motors**\n` +
+              `> ${moneyEmoji} ${valorDisplay}\n` +
               (obs ? `> ${obs}\n` : '') +
               `-# Cotado por <@${interaction.user.id}>`,
           },
