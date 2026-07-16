@@ -60,8 +60,8 @@ function msgRegistroOficial(v) {
     || (historico.length >= 2 ? historico[historico.length - 2].id : null);
   const exProp = exPropId ? `<@${exPropId}>` : 'N/A';
   const donosLabel = totalDonos === 1
-    ? '1º dono — veículo nunca transferido'
-    : `${totalDonos}º dono — veículo passou por ${totalDonos} proprietário(s)`;
+    ? '1º dono'
+    : `${totalDonos}º dono — passou por ${totalDonos} proprietário(s)`;
   components.push(text(
     `## ${carro} ${seta} Veículo ${v.tipo === 'empresarial' ? 'Empresarial' : 'Pessoal'}\n` +
     `> ${dot} **Proprietário atual:** <@${v.comprador_id}>\n` +
@@ -147,7 +147,7 @@ function msgConfirmacaoTransferencia({ veiculo: v, exProprietarioId, novoProprie
   const data = new Date().toLocaleString('pt-BR');
   const historico = v.historico_proprietarios || [];
   const totalDonos = historico.length + 1;
-  const donosLabel = totalDonos === 1 ? '1º dono' : `${totalDonos}º proprietário desde a origem`;
+  const donosLabel = totalDonos === 1 ? '1º dono' : `${totalDonos}º dono — passou por ${totalDonos} proprietário(s)`;
 
   return {
     flags: v2(),
