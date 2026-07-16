@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { idBotEconomia, cargoAtendente, cores } = require('../../config/config');
+const { idBotEconomia, cargoAtendente, cores, canalConceOffsaleId, canalConceLimitedId } = require('../../config/config');
 const { setPendente } = require('../../services/database/db');
 const { gerarVin } = require('../../utils/vinGenerator');
 const { extrairValorEmbed } = require('../../utils/valorParser');
@@ -133,6 +133,12 @@ module.exports = {
       modeloNome = modeloExtra;
     }
 
+    // Detecta categoria pelo canal pai do tópico
+    const parentId = topico.parentId;
+    let categoria = null;
+    if (parentId === canalConceOffsaleId) categoria = 'Offsale';
+    else if (parentId === canalConceLimitedId) categoria = 'Limited';
+
     // Gera VIN
     let vin;
     try { vin = gerarVin(); } catch (err) {
@@ -148,6 +154,7 @@ module.exports = {
       obs: '',
       link_cotacao: msgCotacao?.url || null,
       classe: classeCotacao,
+      categoria,
       comprovante: msgPagamento.url,
       valor_pago: valorPago || 'N/A',
       foto_sugerida: fotoUrl,
@@ -167,6 +174,7 @@ module.exports = {
         obs: '',
         link_cotacao: msgCotacao?.url || null,
         classe: classeCotacao,
+        categoria,
         comprovante: msgPagamento.url,
         valor_pago: valorPago || 'N/A',
         foto_sugerida: fotoUrl,

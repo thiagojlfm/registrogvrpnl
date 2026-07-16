@@ -9,6 +9,8 @@ module.exports = {
   canalImportacaoId: process.env.CANAL_IMPORTACAO_ID,
   canalRegistroVeicularId: process.env.CANAL_REGISTRO_VEICULAR_ID,
   canalAuditoriaId: process.env.CANAL_AUDITORIA_ID,
+  canalConceOffsaleId: '1524196086221246514',
+  canalConceLimitedId: '1524462407752089831',
   cargoAtendente: process.env.CARGO_ATENDENTE_ID,
   idBot911: process.env.ID_BOT_911,
   dbPath: process.env.DB_PATH || './data',

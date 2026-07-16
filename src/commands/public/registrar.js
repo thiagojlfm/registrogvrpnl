@@ -88,6 +88,7 @@ module.exports = {
       cor,
       placa,
       classe: classe || pendente.classe || null,
+      categoria: pendente.categoria || null,
       obs: pendente.obs,
       link_cotacao: pendente.link_cotacao || null,
       comprovante: pendente.comprovante,

@@ -77,6 +77,7 @@ function msgRegistroOficial(v) {
     `> ${rpw} **Versão:** ${modelo || 'N/A'}\n` +
     `> ${rpw} **Coloração:** ${v.cor}\n` +
     `> ${rpw} **Classe:** ${v.classe || 'N/A'}\n` +
+    (v.categoria ? `> ${rpw} **Categoria:** ${v.categoria}\n` : '') +
     `> ${rpw} **Placa:** ${v.placa}\n` +
     `> ${rpc} **VIN Number:** ${v.vin}`
   ));
