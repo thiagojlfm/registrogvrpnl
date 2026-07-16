@@ -7,7 +7,12 @@ const {
   getPendente,
   removerPendente,
   adicionarVeiculo,
+  salvarVeiculos,
+  salvarPendentes,
 } = require('../../services/database/db');
+const fs = require('fs');
+const path = require('path');
+const { dbPath, canalAuditoriaId } = require('../../config/config');
 const { gerarVin } = require('../../utils/vinGenerator');
 const { canalRegistroVeicularId } = require('../../config/config');
 const { msgRegistroOficial } = require('../../utils/formatter');
@@ -58,6 +63,11 @@ module.exports = {
       sub
         .setName('gerar_vin')
         .setDescription('Gera um novo VIN único (apenas para consulta).')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('reset_testes')
+        .setDescription('⚠️ Apaga TUDO: registros, garagens, auditoria e canal. Use só em testes.')
     ),
 
   async execute(interaction) {
@@ -161,6 +171,66 @@ module.exports = {
     if (sub === 'gerar_vin') {
       const vin = gerarVin();
       return interaction.editReply({ content: `🔢 VIN gerado (não reservado): \`${vin}\`` });
+    }
+
+    // ── reset_testes ─────────────────────────────────────────────────────────
+    if (sub === 'reset_testes') {
+      await interaction.editReply({ content: '⏳ Iniciando reset completo...' });
+
+      let etapas = [];
+
+      // 1. Limpa DB
+      salvarVeiculos([]);
+      salvarPendentes({});
+      const importsPath = path.join(dbPath, 'imports_processados.json');
+      const pagamentosPath = path.join(dbPath, 'pagamentos_pendentes.json');
+      if (fs.existsSync(importsPath)) fs.writeFileSync(importsPath, '[]');
+      if (fs.existsSync(pagamentosPath)) fs.writeFileSync(pagamentosPath, '[]');
+      etapas.push('✅ Banco de dados limpo (veículos, pendentes, imports, pagamentos)');
+
+      // 2. Limpa canal de registro
+      try {
+        const canalReg = await interaction.client.channels.fetch(canalRegistroVeicularId);
+        let apagadas = 0;
+        while (true) {
+          const msgs = await canalReg.messages.fetch({ limit: 100 });
+          if (msgs.size === 0) break;
+          const proprias = msgs.filter(m => m.author.id === interaction.client.user.id);
+          if (proprias.size === 0) break;
+          for (const m of proprias.values()) {
+            await m.delete().catch(() => {});
+            apagadas++;
+          }
+          if (msgs.size < 100) break;
+        }
+        etapas.push(`✅ Canal de registro limpo (${apagadas} mensagens apagadas)`);
+      } catch (e) {
+        etapas.push(`⚠️ Canal de registro: ${e.message}`);
+      }
+
+      // 3. Limpa canal de auditoria
+      if (canalAuditoriaId) {
+        try {
+          const canalAud = await interaction.client.channels.fetch(canalAuditoriaId);
+          let apagadas = 0;
+          while (true) {
+            const msgs = await canalAud.messages.fetch({ limit: 100 });
+            if (msgs.size === 0) break;
+            const proprias = msgs.filter(m => m.author.id === interaction.client.user.id);
+            if (proprias.size === 0) break;
+            for (const m of proprias.values()) {
+              await m.delete().catch(() => {});
+              apagadas++;
+            }
+            if (msgs.size < 100) break;
+          }
+          etapas.push(`✅ Canal de auditoria limpo (${apagadas} mensagens apagadas)`);
+        } catch (e) {
+          etapas.push(`⚠️ Canal de auditoria: ${e.message}`);
+        }
+      }
+
+      return interaction.editReply({ content: `## 🧹 Reset concluído\n${etapas.join('\n')}` });
     }
   },
 };
