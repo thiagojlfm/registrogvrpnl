@@ -1,6 +1,7 @@
 const { REST, Routes } = require('discord.js');
 const { token, clientId, guildId } = require('../config/config');
 const { sincronizarCanal, agendarSyncMeiaNoite, recuperarPendentes } = require('../utils/syncCanal');
+const { sincronizarImportacoes } = require('../utils/syncImportacoes');
 const { logDeploy } = require('../services/auditoria');
 const fs = require('fs');
 const path = require('path');
@@ -42,6 +43,10 @@ module.exports = {
     // Recupera pendentes perdidos no redeploy
     recuperarPendentes(client)
       .catch(err => console.error('[startup] Erro ao recuperar pendentes:', err));
+
+    // Varre canal de importações e gera VINs para importações não processadas
+    sincronizarImportacoes(client)
+      .catch(err => console.error('[startup] Erro ao sincronizar importações:', err));
 
     // Agenda sync de reconciliação toda meia-noite
     agendarSyncMeiaNoite(client);
