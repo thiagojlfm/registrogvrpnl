@@ -3,6 +3,7 @@ const { idBotEconomia, cargoAtendente, cores } = require('../../config/config');
 const { setPendente } = require('../../services/database/db');
 const { gerarVin } = require('../../utils/vinGenerator');
 const { extrairValorEmbed } = require('../../utils/valorParser');
+const { logPendente } = require('../../services/auditoria');
 
 const DOIS_HORAS_MS = 2 * 60 * 60 * 1000;
 
@@ -135,6 +136,24 @@ module.exports = {
     });
 
     console.log(`[autorizar_venda] Pendente criado para ${comprador.id} | VIN: ${vin} | Atendente: ${interaction.user.id}`);
+
+    // Backup do pendente na auditoria — recuperável após redeploy
+    logPendente(interaction.client, {
+      comprador_id: comprador.id,
+      pendente: {
+        vin,
+        importador_id: interaction.user.id,
+        veiculo: veiculoNome,
+        modelo: modeloNome,
+        obs: '',
+        link_cotacao: msgCotacao?.url || null,
+        classe: classeCotacao,
+        comprovante: msgPagamento.url,
+        valor_pago: valorPago || 'N/A',
+        foto_sugerida: fotoUrl,
+        criado_em: Date.now(),
+      },
+    }).catch(() => {});
 
     await interaction.editReply({
       flags: MessageFlags.IsComponentsV2,

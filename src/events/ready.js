@@ -1,6 +1,6 @@
 const { REST, Routes } = require('discord.js');
 const { token, clientId, guildId } = require('../config/config');
-const { sincronizarCanal, agendarSyncMeiaNoite } = require('../utils/syncCanal');
+const { sincronizarCanal, agendarSyncMeiaNoite, recuperarPendentes } = require('../utils/syncCanal');
 const { logDeploy } = require('../services/auditoria');
 const fs = require('fs');
 const path = require('path');
@@ -38,6 +38,10 @@ module.exports = {
         return logDeploy(client, { novos, removidos });
       })
       .catch(err => console.error('[sync/startup] Erro:', err));
+
+    // Recupera pendentes perdidos no redeploy
+    recuperarPendentes(client)
+      .catch(err => console.error('[startup] Erro ao recuperar pendentes:', err));
 
     // Agenda sync de reconciliação toda meia-noite
     agendarSyncMeiaNoite(client);

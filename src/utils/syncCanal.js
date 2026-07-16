@@ -1,5 +1,5 @@
-const { canalRegistroVeicularId } = require('../config/config');
-const { lerVeiculos, salvarVeiculos, atualizarVeiculo } = require('../services/database/db');
+const { canalRegistroVeicularId, canalAuditoriaId } = require('../config/config');
+const { lerVeiculos, salvarVeiculos, atualizarVeiculo, lerPendentes, salvarPendentes } = require('../services/database/db');
 const { msgRegistroOficial } = require('./formatter');
 
 function extrairTexto(components = []) {
@@ -219,4 +219,49 @@ function agendarSyncMeiaNoite(client) {
   console.log(`[sync] Próxima reconciliação noturna às ${h}:${m} (em ${Math.round(msAte / 60000)} min)`);
 }
 
-module.exports = { sincronizarCanal, agendarSyncMeiaNoite };
+// Recupera pendentes do canal de auditoria após redeploy
+async function recuperarPendentes(client) {
+  if (!canalAuditoriaId) return 0;
+  try {
+    const canal = await client.channels.fetch(canalAuditoriaId);
+    const msgs = await canal.messages.fetch({ limit: 100 });
+    const pendentesAtuais = lerPendentes();
+    const veiculos = lerVeiculos();
+    const vinsRegistrados = new Set(veiculos.map(v => v.vin));
+    let recuperados = 0;
+
+    for (const msg of msgs.values()) {
+      if (msg.author.id !== client.user.id) continue;
+      const texto = extrairTexto(msg.components);
+      if (!texto.includes('PENDENTE_JSON:')) continue;
+
+      const match = texto.match(/PENDENTE_JSON:(\{.+\})/);
+      if (!match) continue;
+
+      try {
+        const dados = JSON.parse(match[1]);
+        const { comprador_id, vin, criado_em, ...resto } = dados;
+
+        // Pula se já registrado ou se já tem pendente ativo
+        if (vinsRegistrados.has(vin)) continue;
+        if (pendentesAtuais[comprador_id]?.vin === vin) continue;
+        // Pula pendentes com mais de 24h
+        if (criado_em && (Date.now() - criado_em) > 24 * 60 * 60 * 1000) continue;
+
+        pendentesAtuais[comprador_id] = { vin, criado_em, ...resto };
+        recuperados++;
+      } catch {}
+    }
+
+    if (recuperados > 0) {
+      salvarPendentes(pendentesAtuais);
+      console.log(`[sync] ${recuperados} pendente(s) recuperado(s) da auditoria.`);
+    }
+    return recuperados;
+  } catch (err) {
+    console.error('[sync] Erro ao recuperar pendentes:', err.message);
+    return 0;
+  }
+}
+
+module.exports = { sincronizarCanal, agendarSyncMeiaNoite, recuperarPendentes };

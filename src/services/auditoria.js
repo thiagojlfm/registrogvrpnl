@@ -134,4 +134,23 @@ async function logDeploy(client, { novos, removidos }) {
   });
 }
 
-module.exports = { logRegistro, logTransferencia, logEdicaoFoto, logDeploy };
+// ── Pendente de registro (recuperável após redeploy) ──────────────────────────
+
+async function logPendente(client, { comprador_id, pendente }) {
+  await postar(client, {
+    flags: v2(),
+    components: [container(cores.azul, [
+      text(
+        `## 🕐 PENDENTE DE REGISTRO\n` +
+        `> ${dot} **Comprador:** <@${comprador_id}>\n` +
+        `> ${rpc2} **Veículo:** ${pendente.veiculo} ${pendente.modelo || ''}\n` +
+        `> ${rpw} **Placa:** pendente\n` +
+        `> ${rpc} **VIN:** \`${pendente.vin}\`\n` +
+        `-# PENDENTE_JSON:${JSON.stringify({ comprador_id, ...pendente })}\n` +
+        `-# ${ts()}`
+      ),
+    ])],
+  });
+}
+
+module.exports = { logRegistro, logTransferencia, logEdicaoFoto, logDeploy, logPendente };
