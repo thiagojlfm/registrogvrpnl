@@ -16,22 +16,18 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply();
-
-    // Verificação de cargo
+    // Verificação de cargo — ephemeral, só o atendente vê
     if (cargoAtendente && !interaction.member.roles.cache.has(cargoAtendente)) {
-      return interaction.editReply({ content: '❌ Você não tem permissão para autorizar vendas.', flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: '❌ Você não tem permissão para autorizar vendas.', flags: MessageFlags.Ephemeral });
     }
 
     const comprador = interaction.options.getUser('comprador');
-
-    // Precisa estar num tópico ou canal de texto
     const topico = interaction.channel;
     if (!topico) {
-      return interaction.editReply({ content: '❌ Não foi possível acessar o canal/tópico atual.' });
+      return interaction.reply({ content: '❌ Não foi possível acessar o canal/tópico atual.', flags: MessageFlags.Ephemeral });
     }
 
-    // Busca a mensagem que originou o tópico (cotação da conce) e as mensagens dentro do tópico
+    // Busca histórico ANTES de deferir para poder responder ephemeral se necessário
     let msgCotacao = null;
     let todasMensagens = [];
     try {
@@ -43,12 +39,12 @@ module.exports = {
       todasMensagens = [...colecao.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
     } catch (err) {
       console.error('[autorizar_venda] Erro ao buscar histórico:', err.message);
-      return interaction.editReply({ content: '❌ Não foi possível ler o histórico do tópico.' });
+      return interaction.reply({ content: '❌ Não foi possível ler o histórico do tópico.', flags: MessageFlags.Ephemeral });
     }
 
     const agora = Date.now();
 
-    // Trava: só uma VENDA AUTORIZADA por tópico
+    // Trava: só uma VENDA AUTORIZADA por tópico — erro ephemeral (só o atendente vê)
     const msgVendaAutorizada = todasMensagens.find(m => {
       if (m.author.id !== interaction.client.user.id) return false;
       return JSON.stringify(m.components || []).includes('VENDA AUTORIZADA');
@@ -58,14 +54,18 @@ module.exports = {
       const rawTexto = JSON.stringify(msgVendaAutorizada.components || []);
       const compradorExistente = rawTexto.match(/"<@(\d+)>"/)?.[1];
       if (compradorExistente !== comprador.id) {
-        return interaction.editReply({
+        return interaction.reply({
           content:
             `❌ Este tópico já tem uma **VENDA AUTORIZADA** para <@${compradorExistente}>.\n` +
             `Só pode existir uma autorização por tópico.`,
+          flags: MessageFlags.Ephemeral,
         });
       }
-      // Mesmo comprador → re-autorização permitida (recuperação após redeploy)
+      // Mesmo comprador → re-autorização: defer público e continua normalmente
     }
+
+    // A partir daqui a resposta é pública (visível a todos no tópico)
+    await interaction.deferReply();
 
     // Foca no !pay: busca o !pay mais recente nas mensagens do tópico (últimas 2h)
     const msgPayCmd = [...todasMensagens].reverse().find(m => {
