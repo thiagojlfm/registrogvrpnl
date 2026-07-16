@@ -1,17 +1,18 @@
 const { canalRegistroVeicularId } = require('../config/config');
-const { lerVeiculos } = require('../services/database/db');
+const { lerVeiculos, removerCotacaoPorMensagem } = require('../services/database/db');
 const { logApagouRegistro } = require('../services/auditoria');
 
 module.exports = {
   name: 'messageDelete',
   async execute(message) {
-    if (message.channelId !== canalRegistroVeicularId) return;
+    // Cotação apagada do tópico → remove do registro para permitir nova cotação
+    removerCotacaoPorMensagem(message.id);
 
-    // Encontra o veículo pelo link_registro que contém o ID da mensagem apagada
+    // Registro oficial apagado do canal-registro-veicular → log na auditoria
+    if (message.channelId !== canalRegistroVeicularId) return;
     const veiculos = lerVeiculos();
     const veiculo = veiculos.find(v => v.ativo && v.link_registro?.includes(message.id));
     if (!veiculo) return;
-
     await logApagouRegistro(message.client, { veiculo });
   },
 };

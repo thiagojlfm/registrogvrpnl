@@ -167,6 +167,45 @@ async function logPendente(client, { comprador_id, pendente }) {
   });
 }
 
+// ── Cotação registrada ────────────────────────────────────────────────────────
+
+async function logCotacao(client, { atendenteId, topicoId, topicoNome, valor, obs }) {
+  await postar(client, {
+    flags: v2(),
+    components: [container(cores.amarelo, [
+      text(`## 💰 COTAÇÃO REGISTRADA`),
+      sep(),
+      text(
+        `> ${dot} **Atendente:** <@${atendenteId}>\n` +
+        `> ${dot} **Tópico:** <#${topicoId}> (${topicoNome})\n` +
+        `> ${dot} **Valor cotado:** ${valor}\n` +
+        (obs ? `> ${dot} **Observação:** ${obs}\n` : '') +
+        `-# Log gerado automaticamente · ${ts()}`
+      ),
+    ])],
+  });
+}
+
+// ── Comissão registrada ───────────────────────────────────────────────────────
+
+async function logComissao(client, { num, atendenteId, carro, vin, valorVenda, valorComissao }) {
+  await postar(client, {
+    flags: v2(),
+    components: [container(cores.verde, [
+      text(`## 💸 COMISSÃO REGISTRADA — VENDA #${num}`),
+      sep(),
+      text(
+        `> ${dot} **Atendente:** <@${atendenteId}>\n` +
+        `> ${dot} **Veículo:** ${carro}\n` +
+        `> ${rpc} **VIN:** \`${vin}\`\n` +
+        `> ${dot} **Valor da venda:** ${valorVenda}\n` +
+        `> ${dot} **Comissão (2%):** ${valorComissao}\n` +
+        `-# Log gerado automaticamente · ${ts()}`
+      ),
+    ])],
+  });
+}
+
 // ── Registro apagado do canal ─────────────────────────────────────────────────
 
 async function logApagouRegistro(client, { veiculo: v }) {
@@ -218,4 +257,4 @@ async function logApagouRegistro(client, { veiculo: v }) {
   }
 }
 
-module.exports = { logRegistro, logTransferencia, logEdicaoFoto, logDeploy, logPendente, logApagouRegistro };
+module.exports = { logRegistro, logTransferencia, logEdicaoFoto, logDeploy, logPendente, logApagouRegistro, logCotacao, logComissao };

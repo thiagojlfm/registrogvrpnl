@@ -2,19 +2,23 @@ const fs = require('fs');
 const path = require('path');
 const { dbPath } = require('../../config/config');
 
-const veiculosPath = path.join(dbPath, 'veiculos.json');
+const veiculosPath  = path.join(dbPath, 'veiculos.json');
 const pendentesPath = path.join(dbPath, 'pendentes.json');
 const pagamentosPath = path.join(dbPath, 'pagamentos_pendentes.json');
-const importsPath = path.join(dbPath, 'imports_processados.json');
+const importsPath   = path.join(dbPath, 'imports_processados.json');
+const cotacoesPath  = path.join(dbPath, 'cotacoes.json');
+const comissoesPath = path.join(dbPath, 'comissoes.json');
 
 const EXPIRY_MS = 30 * 60 * 1000; // 30 minutos
 
 function ensureFiles() {
   if (!fs.existsSync(dbPath)) fs.mkdirSync(dbPath, { recursive: true });
-  if (!fs.existsSync(veiculosPath)) fs.writeFileSync(veiculosPath, '[]');
+  if (!fs.existsSync(veiculosPath))  fs.writeFileSync(veiculosPath, '[]');
   if (!fs.existsSync(pendentesPath)) fs.writeFileSync(pendentesPath, '{}');
   if (!fs.existsSync(pagamentosPath)) fs.writeFileSync(pagamentosPath, '[]');
-  if (!fs.existsSync(importsPath)) fs.writeFileSync(importsPath, '[]');
+  if (!fs.existsSync(importsPath))   fs.writeFileSync(importsPath, '[]');
+  if (!fs.existsSync(cotacoesPath))  fs.writeFileSync(cotacoesPath, '{}');
+  if (!fs.existsSync(comissoesPath)) fs.writeFileSync(comissoesPath, '[]');
 }
 
 function lerImportsProcessados() {
@@ -151,6 +155,58 @@ function limparPagamentosExpirados() {
   salvarPagamentos(ativos);
 }
 
+// ── Cotações ──────────────────────────────────────────────────────────────────
+
+function lerCotacoes() {
+  ensureFiles();
+  return JSON.parse(fs.readFileSync(cotacoesPath, 'utf8'));
+}
+
+function salvarCotacoes(cotacoes) {
+  ensureFiles();
+  fs.writeFileSync(cotacoesPath, JSON.stringify(cotacoes, null, 2));
+}
+
+function setCotacao(topicoId, dados) {
+  const cotacoes = lerCotacoes();
+  cotacoes[topicoId] = dados;
+  salvarCotacoes(cotacoes);
+}
+
+function getCotacao(topicoId) {
+  const cotacoes = lerCotacoes();
+  return cotacoes[topicoId] || null;
+}
+
+function removerCotacaoPorMensagem(messageId) {
+  const cotacoes = lerCotacoes();
+  const topicoId = Object.keys(cotacoes).find(k => cotacoes[k].message_id === messageId);
+  if (!topicoId) return false;
+  delete cotacoes[topicoId];
+  salvarCotacoes(cotacoes);
+  return true;
+}
+
+// ── Comissões ─────────────────────────────────────────────────────────────────
+
+function lerComissoes() {
+  ensureFiles();
+  return JSON.parse(fs.readFileSync(comissoesPath, 'utf8'));
+}
+
+function salvarComissoes(comissoes) {
+  ensureFiles();
+  fs.writeFileSync(comissoesPath, JSON.stringify(comissoes, null, 2));
+}
+
+function registrarComissao(dados) {
+  const comissoes = lerComissoes();
+  const num = comissoes.length + 1;
+  comissoes.push({ num, ...dados });
+  salvarComissoes(comissoes);
+  return num;
+}
+
 module.exports = {
   lerImportsProcessados,
   marcarImportProcessado,
@@ -172,4 +228,10 @@ module.exports = {
   getPagamentoPendente,
   marcarPagamentoUsado,
   limparPagamentosExpirados,
+  lerCotacoes,
+  setCotacao,
+  getCotacao,
+  removerCotacaoPorMensagem,
+  lerComissoes,
+  registrarComissao,
 };
