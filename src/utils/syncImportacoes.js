@@ -32,12 +32,16 @@ async function sincronizarImportacoes(client) {
     if (msgs.size === 0) break;
 
     for (const msg of msgs.values()) {
-      console.log(`[sync/import] msg author=${msg.author.id} embeds=${msg.embeds?.length} content="${msg.content?.slice(0,30)}"`);
       if (msg.author.id !== idBotImportacao) continue;
 
-      const raw = JSON.stringify(msg.embeds || '') + (msg.content || '');
-      console.log(`[sync/import] raw snippet: ${raw.slice(0, 100)}`);
-      if (!raw.includes('IMPORTA')) continue; // filtra rápido
+      console.log(`[sync/import] msg id=${msg.id} type=${msg.type} flags=${msg.flags?.bitfield}`);
+      console.log(`[sync/import]   embeds=${msg.embeds?.length} attachments=${msg.attachments?.size} components=${msg.components?.length}`);
+      console.log(`[sync/import]   content="${msg.content?.slice(0,80)}"`);
+      if (msg.embeds?.length) console.log(`[sync/import]   embed[0] title="${msg.embeds[0]?.title}" desc="${msg.embeds[0]?.description?.slice(0,80)}"`);
+      if (msg.attachments?.size) msg.attachments.forEach(a => console.log(`[sync/import]   attachment: ${a.contentType} ${a.url?.slice(0,60)}`));
+
+      const raw = JSON.stringify(msg.embeds || '') + (msg.content || '') + JSON.stringify(msg.components || '');
+      if (!raw.includes('IMPORTA')) { console.log(`[sync/import]   skip: sem IMPORTA`); continue; }
 
       const dados = parsearMensagemImportacao(msg);
       console.log(`[sync/import] msg ${msg.id} → comprador_id=${dados.comprador_id} comprovante=${dados.comprovante} valor=${dados.valor_pago}`);
