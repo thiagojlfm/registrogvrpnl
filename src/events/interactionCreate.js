@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
 const { buscarVeiculoPorVin, atualizarVeiculo } = require('../services/database/db');
 const { msgTransferencia } = require('../utils/formatter');
 const { canalRegistroVeicularId } = require('../config/config');
@@ -58,7 +58,7 @@ module.exports = {
         await cmd.execute(interaction);
       } catch (err) {
         console.error(`[interactionCreate] Erro em /${interaction.commandName}:`, err);
-        const r = { content: '❌ Ocorreu um erro ao executar este comando.', ephemeral: true };
+        const r = { content: '❌ Ocorreu um erro ao executar este comando.', flags: MessageFlags.Ephemeral };
         interaction.replied || interaction.deferred ? await interaction.followUp(r) : await interaction.reply(r);
       }
       return;
@@ -87,7 +87,7 @@ module.exports = {
 
     // ── Modal: confirmar transferência ───────────────────────────────────────
     if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_transferir:')) {
-      await interaction.deferReply({ ephemeral: false });
+      await interaction.deferReply();
 
       const vin = interaction.customId.split(':')[1];
       const novoId = interaction.fields.getTextInputValue('novo_proprietario_id').trim();

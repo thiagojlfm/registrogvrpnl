@@ -9,7 +9,7 @@ module.exports = {
     .setDescription('Abre sua garagem e transfere um veículo para outro usuário.'),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: false });
+    await interaction.deferReply();
 
     let veiculos = buscarVeiculosPorProprietario(interaction.user.id);
 
@@ -47,26 +47,17 @@ module.exports = {
     for (const v of veiculos) {
       const data = new Date(v.data_registro).toLocaleDateString('pt-BR');
 
-      const cardSection = {
-        type: 9,
-        components: [{
-          type: 10,
-          content:
-            `### ${em.rpc2} ${v.veiculo}\n` +
-            `> ${em.rpw} **Versão:** ${v.modelo || 'N/A'}\n` +
-            `> ${em.rpw} **Placa:** \`${v.placa}\`\n` +
-            `> ${em.rpw} **Classe:** ${v.classe || 'N/A'}\n` +
-            `> ${em.rpc} **VIN:** \`${v.vin}\`\n` +
-            `-# Registrado em ${data}`,
-        }],
-      };
-
-      // Foto como thumbnail se disponível
-      if (v.foto_url) {
-        cardSection.accessory = { type: 11, media: { url: v.foto_url } };
-      }
-
-      components.push(cardSection);
+      components.push({
+        type: 10,
+        content:
+          `### ${em.rpc2} ${v.veiculo}\n` +
+          `> ${em.rpw} **Versão:** ${v.modelo || 'N/A'}\n` +
+          `> ${em.rpw} **Placa:** \`${v.placa}\`\n` +
+          `> ${em.rpw} **Classe:** ${v.classe || 'N/A'}\n` +
+          `> ${em.rpc} **VIN:** \`${v.vin}\`` +
+          (v.foto_url ? `\n> ${em.dot} **Foto:** [Ver](${v.foto_url})` : '') +
+          `\n-# Registrado em ${data}`,
+      });
 
       // Botões do card
       const botoes = [{
