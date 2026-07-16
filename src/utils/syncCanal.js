@@ -182,10 +182,12 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
   let lista = [...vinsExistentes.values()];
 
   if (reconciliar) {
-    // Remove veículos sem registro no canal
-    const antes = lista.length;
-    lista = lista.filter(v => vinsNoCanal.has(v.vin));
-    removidos = antes - lista.length;
+    // Preserva inativos (soft-deleted) — só filtra os ativos pelo canal
+    const inativos = lista.filter(v => !v.ativo);
+    const ativos   = lista.filter(v => v.ativo);
+    const ativosNoCanal = ativos.filter(v => vinsNoCanal.has(v.vin));
+    removidos = ativos.length - ativosNoCanal.length;
+    lista = [...ativosNoCanal, ...inativos];
 
     // Edita mensagens de registro para refletir o proprietário atual
     for (const [vin, t] of transferenciasNoCanal) {
@@ -293,7 +295,7 @@ async function recuperarPendentes(client) {
 
             // Extrai comprador_id e VIN do texto
             const compradorMatch = texto.match(/Comprador[:\s]+<@(\d+)>/);
-            const vinMatch = texto.match(/VIN[:\s`]+([0-9]{9})/);
+            const vinMatch = texto.match(/VIN[^0-9]*([0-9]{9})/);
             if (!compradorMatch || !vinMatch) continue;
 
             const comprador_id = compradorMatch[1];
@@ -305,6 +307,9 @@ async function recuperarPendentes(client) {
             // Extrai dados básicos do texto para recriar o pendente mínimo
             const veiculoMatch = texto.match(/Veículo[:\s]+(.+?)(?:\n|$)/);
             const veiculoTexto = veiculoMatch ? veiculoMatch[1].replace(/\*\*/g, '').trim() : 'Não identificado';
+            // Extrai comprovante real do pagamento (link do UB no texto da VENDA AUTORIZADA)
+            const comprovanteMatch = texto.match(/[Cc]omprovante[^\n]*(https:\/\/discord\.com\/\S+)/);
+            const comprovanteUrl = comprovanteMatch ? comprovanteMatch[1] : null;
 
             pendentesAtuais[comprador_id] = {
               vin,
@@ -314,8 +319,8 @@ async function recuperarPendentes(client) {
               obs: '',
               link_cotacao: null,
               classe: null,
-              comprovante: msg.url,
-              valor_pago: 'N/A',
+              comprovante: comprovanteUrl,
+              valor_pago: null,
               criado_em: msg.createdTimestamp,
             };
             recuperados++;

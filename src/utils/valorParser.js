@@ -7,6 +7,11 @@ function normalizarValor(str) {
   const s = String(str).replace(/[^0-9.,]/g, '');
   if (!s) return null;
 
+  // Vírgula como separador de milhar US: "45,000" (exatamente 3 dígitos após única vírgula, sem ponto)
+  if (s.includes(',') && !s.includes('.') && /^[\d,]+$/.test(s) && /,\d{3}$/.test(s)) {
+    return Math.round(parseFloat(s.replace(/,/g, '')) * 100);
+  }
+
   // Formato BR: 45.563,00 → separador decimal é vírgula
   if (s.includes(',') && s.lastIndexOf(',') > s.lastIndexOf('.')) {
     const norm = s.replace(/\./g, '').replace(',', '.');

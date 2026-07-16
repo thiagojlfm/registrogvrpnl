@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('discord.js');
 const { canalRegistroVeicularId } = require('../../config/config');
 const { buscarVeiculoPorPlaca, atualizarVeiculo } = require('../../services/database/db');
 const { msgRegistroOficial } = require('../../utils/formatter');
+const { logEdicaoFoto } = require('../../services/auditoria');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -33,14 +34,16 @@ module.exports = {
     // Apaga mensagem de registro anterior, se existir
     if (veiculo.link_registro) {
       try {
-        const [, , , guildId, canalId, msgId] = veiculo.link_registro.split('/');
-        const canal = await interaction.client.channels.fetch(canalId);
-        const msgAntiga = await canal.messages.fetch(msgId);
+        const { channelId, messageId } = require('../../utils/valorParser').parsearUrlDiscord(veiculo.link_registro);
+        const canalAnt = await interaction.client.channels.fetch(channelId);
+        const msgAntiga = await canalAnt.messages.fetch(messageId);
         await msgAntiga.delete();
       } catch {
         // Mensagem já apagada ou sem permissão — segue em frente
       }
     }
+
+    const fotoAntiga = veiculo.foto_url;
 
     // Atualiza foto no banco
     atualizarVeiculo(veiculo.vin, { foto_url: novaFoto.url });
@@ -52,6 +55,13 @@ module.exports = {
 
     const linkNovo = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgNova.id}`;
     atualizarVeiculo(veiculo.vin, { link_registro: linkNovo });
+
+    await logEdicaoFoto(interaction.client, {
+      veiculo,
+      editorId: interaction.user.id,
+      fotoAntiga,
+      fotoNova: novaFoto.url,
+    });
 
     await interaction.editReply({
       content: `✅ Foto do veículo **${placa}** atualizada com sucesso!\n🔗 ${linkNovo}`,
