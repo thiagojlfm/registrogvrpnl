@@ -118,15 +118,16 @@ async function logEdicaoFoto(client, { veiculo: v, editorId, fotoAntiga, fotoNov
 // ── Sync no deploy ────────────────────────────────────────────────────────────
 
 async function logDeploy(client, { novos, removidos }) {
-  if (novos === 0 && removidos === 0) return;
+  // Só loga se houve remoções — registros novos têm logRegistro próprio
+  if (removidos === 0) return;
   await postar(client, {
     flags: v2(),
-    components: [container(cores.azul, [
-      text(`## 🔄 SYNC NO DEPLOY`),
+    components: [container(cores.vermelho, [
+      text(`## 🔄 SYNC NO DEPLOY — REMOÇÕES DETECTADAS`),
       sep(),
       text(
-        `> ${dot} **Veículos importados:** ${novos}\n` +
-        `> ${dot} **Removidos (registro apagado):** ${removidos}`
+        `> ${dot} **Veículos novos sincronizados:** ${novos}\n` +
+        `> ${dot} **Removidos (registro apagado do canal):** ${removidos}`
       ),
       sep(),
       text(`-# Log gerado automaticamente · ${ts()}`),

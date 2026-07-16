@@ -123,6 +123,7 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
           todasMsgsRegistro.push(msg);
         }
         if (!vinsExistentes.has(registro.vin)) {
+          console.log(`[sync] novo VIN no canal: ${registro.vin} (placa ${registro.placa}) — não estava no DB`);
           vinsExistentes.set(registro.vin, registro);
           novos++;
         }
