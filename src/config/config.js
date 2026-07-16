@@ -12,14 +12,18 @@ module.exports = {
   canalConceOffsaleId: '1524196086221246514',
   canalConceLimitedId: '1524462407752089831',
   cargoAtendente: process.env.CARGO_ATENDENTE_ID,
+  cargoStaff:     process.env.CARGO_STAFF_ID,
+  cargoBooster:   process.env.CARGO_BOOSTER_ID,
   idBot911: process.env.ID_BOT_911,
   dbPath: process.env.DB_PATH || './data',
 
   cores: {
-    verde: 0x57F287,
-    azul: 0x5865F2,
+    verde:   0x57F287,
+    azul:    0x5865F2,
     amarelo: 0xFEE75C,
     vermelho: 0xED4245,
+    roxo:    0x9B59B6,
+    rosa:    0xFF73FA,
   },
 
   emojis: {

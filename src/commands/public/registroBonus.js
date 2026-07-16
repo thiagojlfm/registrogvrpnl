@@ -1,0 +1,156 @@
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { canalRegistroVeicularId, cargoStaff, cargoBooster, cores } = require('../../config/config');
+const { adicionarVeiculo, atualizarVeiculo, lerVeiculos, salvarVeiculos, podeTrocarBonus, setBonusCooldown } = require('../../services/database/db');
+const { msgRegistroBonus } = require('../../utils/formatter');
+const { gerarVin } = require('../../utils/vinGenerator');
+const { logRegistro } = require('../../services/auditoria');
+
+const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+
+function formatarRestante(ms) {
+  const horas = Math.floor(ms / 3_600_000);
+  const dias  = Math.floor(horas / 24);
+  const hRest = horas % 24;
+  return dias > 0 ? `${dias}d ${hRest}h` : `${horas}h`;
+}
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('registroveiculobonus')
+    .setDescription('Registra veículo de benefício (Staff ou Boost).')
+    .addStringOption(o =>
+      o.setName('tipo')
+        .setDescription('Tipo do benefício')
+        .setRequired(true)
+        .addChoices(
+          { name: '🛡️ Staff', value: 'staff' },
+          { name: '🚀 Boost', value: 'boost' },
+        )
+    )
+    .addStringOption(o =>
+      o.setName('carro').setDescription('Ano, marca e modelo (ex: 2021 Ferrari SF90)').setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName('modelo').setDescription('Versão / trim (ex: Stradale)').setRequired(false)
+    )
+    .addStringOption(o =>
+      o.setName('placa').setDescription('Placa do veículo (ex: GVR-1234)').setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName('cor').setDescription('Cor do veículo').setRequired(true)
+    )
+    .addAttachmentOption(o =>
+      o.setName('foto').setDescription('Foto do veículo com a placa visível').setRequired(true)
+    ),
+
+  async execute(interaction) {
+    const tipo = interaction.options.getString('tipo');
+
+    // Verifica cargo
+    const cargoNecessario = tipo === 'staff' ? cargoStaff : cargoBooster;
+    if (cargoNecessario && !interaction.member.roles.cache.has(cargoNecessario)) {
+      return interaction.reply({
+        content: `❌ Você não tem o cargo necessário para registrar um veículo de **${tipo === 'staff' ? 'Staff' : 'Boost'}**.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    // Verifica cooldown de 7 dias
+    const { pode, restante } = podeTrocarBonus(interaction.user.id, tipo);
+    if (!pode) {
+      return interaction.reply({
+        content: `⏳ Você só pode trocar seu veículo de ${tipo === 'staff' ? 'Staff' : 'Boost'} em **${formatarRestante(restante)}**.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    await interaction.deferReply();
+
+    const carroStr = interaction.options.getString('carro');
+    const modelo   = interaction.options.getString('modelo') || null;
+    const placa    = interaction.options.getString('placa');
+    const cor      = interaction.options.getString('cor');
+    const foto     = interaction.options.getAttachment('foto');
+
+    // Desativa veículo bônus anterior do mesmo tipo
+    const veiculos = lerVeiculos();
+    const anterior = veiculos.find(v =>
+      v.ativo && v.comprador_id === interaction.user.id && v.tipo_bonus === tipo
+    );
+    if (anterior) {
+      const idx = veiculos.findIndex(v => v.vin === anterior.vin);
+      veiculos[idx].ativo = false;
+      salvarVeiculos(veiculos);
+    }
+
+    const vin = gerarVin();
+    const agora = Date.now();
+
+    const veiculo = {
+      vin,
+      comprador_id: interaction.user.id,
+      importador_id: null,
+      veiculo: carroStr,
+      modelo,
+      cor,
+      placa,
+      classe: null,
+      categoria: null,
+      obs: null,
+      link_cotacao: null,
+      comprovante: null,
+      comprovante_recompra: null,
+      valor_pago: null,
+      foto_url: foto.url,
+      link_registro: null,
+      tipo: 'pessoal',
+      tipo_bonus: tipo,
+      empresa: null,
+      empresa_link: null,
+      finalidade: null,
+      historico_proprietarios: [],
+      data_registro: agora,
+      ativo: true,
+    };
+
+    adicionarVeiculo(veiculo);
+    setBonusCooldown(interaction.user.id, tipo);
+
+    const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
+    const msgPublicada = await canal.send(msgRegistroBonus(veiculo));
+    const linkRegistro = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgPublicada.id}`;
+    atualizarVeiculo(vin, { link_registro: linkRegistro });
+
+    await logRegistro(interaction.client, {
+      veiculo: { ...veiculo, link_registro: linkRegistro },
+      registradorId: interaction.user.id,
+      linkRegistro,
+    });
+
+    const cor_embed = tipo === 'staff' ? cores.roxo : cores.rosa;
+    const tag = tipo === 'staff' ? '🛡️ Carro Staff' : '🚀 Carro Boost';
+
+    await interaction.editReply({
+      flags: MessageFlags.IsComponentsV2,
+      components: [{
+        type: 17,
+        accent_color: cor_embed,
+        components: [
+          {
+            type: 10,
+            content:
+              `## ✅ ${tag} REGISTRADO\n` +
+              `> **Veículo:** ${carroStr}${modelo ? ` ${modelo}` : ''}\n` +
+              `> **Placa:** \`${placa}\`\n` +
+              `> **VIN:** \`${vin}\``,
+          },
+          { type: 14, divider: true, spacing: 1 },
+          {
+            type: 10,
+            content: `⏳ Próxima troca disponível em **7 dias**.\n[Ver registro](${linkRegistro})`,
+          },
+        ],
+      }],
+    });
+  },
+};

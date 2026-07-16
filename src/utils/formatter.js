@@ -178,6 +178,35 @@ function msgConfirmacaoTransferencia({ veiculo: v, exProprietarioId, novoProprie
   };
 }
 
+// ── Registro Bônus (Staff / Boost) ───────────────────────────────────────────
+
+function msgRegistroBonus(v) {
+  const data = new Date(v.data_registro).toLocaleDateString('pt-BR');
+  const cor = v.tipo_bonus === 'staff' ? cores.roxo : cores.rosa;
+  const tag = v.tipo_bonus === 'staff' ? '🛡️ CARRO STAFF' : '🚀 CARRO BOOST';
+
+  return {
+    flags: v2(),
+    components: [container(cor, [
+      text(`## ${carro} ${tag}`),
+      sep(),
+      text(
+        `## ${carro} ${seta} Veículo\n` +
+        `> ${dot} **Proprietário:** <@${v.comprador_id}>\n` +
+        `> ${rpc2} **Ano, marca, modelo:** ${v.veiculo}\n` +
+        `> ${rpw} **Versão:** ${v.modelo || 'N/A'}\n` +
+        `> ${rpw} **Coloração:** ${v.cor}\n` +
+        `> ${rpw} **Placa:** ${v.placa}\n` +
+        `> ${rpc} **VIN Number:** ${v.vin}`
+      ),
+      sep(),
+      ...(v.foto_url ? [mediaGallery([v.foto_url])] : []),
+      sep(),
+      text(`-# Registro gerado automaticamente · ${data}`),
+    ])],
+  };
+}
+
 // ── Consulta ──────────────────────────────────────────────────────────────────
 
 function msgConsulta(veiculos, pessoa) {
@@ -209,6 +238,7 @@ function msgConsulta(veiculos, pessoa) {
 module.exports = {
   msgImportacaoRegistrada,
   msgRegistroOficial,
+  msgRegistroBonus,
   msgTransferencia,
   msgConfirmacaoTransferencia,
   msgConsulta,

@@ -6,8 +6,9 @@ const veiculosPath  = path.join(dbPath, 'veiculos.json');
 const pendentesPath = path.join(dbPath, 'pendentes.json');
 const pagamentosPath = path.join(dbPath, 'pagamentos_pendentes.json');
 const importsPath   = path.join(dbPath, 'imports_processados.json');
-const cotacoesPath  = path.join(dbPath, 'cotacoes.json');
-const comissoesPath = path.join(dbPath, 'comissoes.json');
+const cotacoesPath   = path.join(dbPath, 'cotacoes.json');
+const comissoesPath  = path.join(dbPath, 'comissoes.json');
+const bonusCooldownsPath = path.join(dbPath, 'bonus_cooldowns.json');
 
 const EXPIRY_MS = 30 * 60 * 1000; // 30 minutos
 
@@ -17,8 +18,9 @@ function ensureFiles() {
   if (!fs.existsSync(pendentesPath)) fs.writeFileSync(pendentesPath, '{}');
   if (!fs.existsSync(pagamentosPath)) fs.writeFileSync(pagamentosPath, '[]');
   if (!fs.existsSync(importsPath))   fs.writeFileSync(importsPath, '[]');
-  if (!fs.existsSync(cotacoesPath))  fs.writeFileSync(cotacoesPath, '{}');
-  if (!fs.existsSync(comissoesPath)) fs.writeFileSync(comissoesPath, '[]');
+  if (!fs.existsSync(cotacoesPath))       fs.writeFileSync(cotacoesPath, '{}');
+  if (!fs.existsSync(comissoesPath))      fs.writeFileSync(comissoesPath, '[]');
+  if (!fs.existsSync(bonusCooldownsPath)) fs.writeFileSync(bonusCooldownsPath, '{}');
 }
 
 function lerImportsProcessados() {
@@ -155,6 +157,33 @@ function limparPagamentosExpirados() {
   salvarPagamentos(ativos);
 }
 
+// ── Veículo Bônus (Staff / Boost) cooldowns ──────────────────────────────────
+
+const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+
+function lerBonusCooldowns() {
+  ensureFiles();
+  return JSON.parse(fs.readFileSync(bonusCooldownsPath, 'utf8'));
+}
+
+function getBonusCooldown(discordId, tipo) {
+  const cooldowns = lerBonusCooldowns();
+  return cooldowns[`${discordId}:${tipo}`] || null;
+}
+
+function setBonusCooldown(discordId, tipo) {
+  const cooldowns = lerBonusCooldowns();
+  cooldowns[`${discordId}:${tipo}`] = Date.now();
+  fs.writeFileSync(bonusCooldownsPath, JSON.stringify(cooldowns, null, 2));
+}
+
+function podeTrocarBonus(discordId, tipo) {
+  const ts = getBonusCooldown(discordId, tipo);
+  if (!ts) return { pode: true, restante: 0 };
+  const restante = SETE_DIAS_MS - (Date.now() - ts);
+  return restante <= 0 ? { pode: true, restante: 0 } : { pode: false, restante };
+}
+
 // ── Cotações ──────────────────────────────────────────────────────────────────
 
 function lerCotacoes() {
@@ -235,4 +264,7 @@ module.exports = {
   removerCotacaoPorMensagem,
   lerComissoes,
   registrarComissao,
+  getBonusCooldown,
+  setBonusCooldown,
+  podeTrocarBonus,
 };
