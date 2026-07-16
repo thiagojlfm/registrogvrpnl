@@ -56,28 +56,65 @@ function parseContent(content) {
   return resultado;
 }
 
+// Extrai todo o texto de uma árvore de Components V2 (type 10 = TextDisplay)
+function extrairTextoV2(components) {
+  if (!Array.isArray(components)) return '';
+  const partes = [];
+  for (const c of components) {
+    if (c.type === 10 && c.content) partes.push(c.content);
+    if (c.components) partes.push(extrairTextoV2(c.components));
+    if (c.accessory) partes.push(extrairTextoV2([c.accessory]));
+  }
+  return partes.join('\n');
+}
+
 function parsearMensagemImportacao(message) {
   let dados = {};
 
-  // 1. Embed fields (formato estruturado)
-  if (message.embeds?.length > 0 && message.embeds[0].fields?.length > 0) {
-    dados = parseEmbedFields(message.embeds[0].fields);
+  // 1. Components V2 (flags & 32768) — texto dentro da árvore de componentes
+  const isV2 = (message.flags?.bitfield ?? message.flags ?? 0) & 32768;
+  if (isV2 && message.components?.length > 0) {
+    const raw = message.toJSON?.() ?? { components: [] };
+    const textoV2 = extrairTextoV2(raw.components)
+      .replace(/^>\s*/gm, '')
+      .replace(/\*\*/g, '')
+      .replace(/#{1,3}\s*/g, '');
+    const doV2 = parseContent(textoV2);
+    for (const [k, v] of Object.entries(doV2)) {
+      if (!dados[k]) dados[k] = v;
+    }
+    // Menções inline: captura <@ID> logo após "Comprador" mesmo sem ":" separando
+    if (!dados.comprador) {
+      const m = textoV2.match(/[Cc]omprador[^\n<]*(<@!?\d+>)/);
+      if (m) dados.comprador = m[1];
+    }
+    if (!dados.comprovante) {
+      const m = textoV2.match(/[Cc]omprovante[^\n]*(https:\/\/\S+)/);
+      if (m) dados.comprovante = m[1];
+    }
   }
 
-  // 2. Embed description (formato "> Campo: valor" ou "Campo: valor")
-  const semDados = Object.keys(MAP_CAMPOS).some(k => !dados[k]);
-  if (semDados && message.embeds?.[0]?.description) {
+  // 2. Embed fields
+  if (message.embeds?.length > 0 && message.embeds[0].fields?.length > 0) {
+    const doFields = parseEmbedFields(message.embeds[0].fields);
+    for (const [k, v] of Object.entries(doFields)) {
+      if (!dados[k]) dados[k] = v;
+    }
+  }
+
+  // 3. Embed description (formato "> Campo: valor")
+  if (message.embeds?.[0]?.description) {
     const descricao = message.embeds[0].description
-      .replace(/^>\s*/gm, '')   // remove "> " do início de cada linha
-      .replace(/\*\*/g, '');    // remove bold markdown
+      .replace(/^>\s*/gm, '')
+      .replace(/\*\*/g, '');
     const doDesc = parseContent(descricao);
     for (const [k, v] of Object.entries(doDesc)) {
       if (!dados[k]) dados[k] = v;
     }
   }
 
-  // 3. Fallback no content
-  if (Object.keys(MAP_CAMPOS).some(k => !dados[k]) && message.content) {
+  // 4. Fallback no content
+  if (message.content) {
     const doContent = parseContent(message.content);
     for (const [k, v] of Object.entries(doContent)) {
       if (!dados[k]) dados[k] = v;

@@ -34,14 +34,16 @@ async function sincronizarImportacoes(client) {
     for (const msg of msgs.values()) {
       if (msg.author.id !== idBotImportacao) continue;
 
-      console.log(`[sync/import] msg id=${msg.id} type=${msg.type} flags=${msg.flags?.bitfield}`);
-      console.log(`[sync/import]   embeds=${msg.embeds?.length} attachments=${msg.attachments?.size} components=${msg.components?.length}`);
-      console.log(`[sync/import]   content="${msg.content?.slice(0,80)}"`);
-      if (msg.embeds?.length) console.log(`[sync/import]   embed[0] title="${msg.embeds[0]?.title}" desc="${msg.embeds[0]?.description?.slice(0,80)}"`);
-      if (msg.attachments?.size) msg.attachments.forEach(a => console.log(`[sync/import]   attachment: ${a.contentType} ${a.url?.slice(0,60)}`));
+      // Extrai texto bruto de mensagens V2 para o filtro e para o log
+      const isV2 = (msg.flags?.bitfield ?? 0) & 32768;
+      let rawTexto = (msg.content || '') + JSON.stringify(msg.embeds || '');
+      if (isV2) {
+        try { rawTexto += JSON.stringify(msg.toJSON().components || ''); } catch {}
+      }
 
-      const raw = JSON.stringify(msg.embeds || '') + (msg.content || '') + JSON.stringify(msg.components || '');
-      if (!raw.includes('IMPORTA')) { console.log(`[sync/import]   skip: sem IMPORTA`); continue; }
+      if (!rawTexto.includes('IMPORTA')) continue;
+
+      console.log(`[sync/import] candidata id=${msg.id} flags=${msg.flags?.bitfield} isV2=${!!isV2}`);
 
       const dados = parsearMensagemImportacao(msg);
       console.log(`[sync/import] msg ${msg.id} → comprador_id=${dados.comprador_id} comprovante=${dados.comprovante} valor=${dados.valor_pago}`);
