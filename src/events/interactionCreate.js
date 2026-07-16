@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
-const { buscarVeiculoPorVin, atualizarVeiculo } = require('../services/database/db');
+const { buscarVeiculoPorVin, atualizarVeiculo, buscarVeiculosPorProprietario } = require('../services/database/db');
+const { buildCard } = require('../commands/public/garagem');
 const { msgTransferencia } = require('../utils/formatter');
 const { canalRegistroVeicularId } = require('../config/config');
 const { notificar911 } = require('../services/notificar911');
@@ -68,6 +69,22 @@ module.exports = {
     if (interaction.isStringSelectMenu() && interaction.customId === 'sel_transferir_garagem') {
       const vin = interaction.values[0];
       return abrirModalTransferencia(interaction, vin);
+    }
+
+    // ── Botão: Navegação garagem (◀ ▶) ──────────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith('btn_garagem_nav:')) {
+      const parts = interaction.customId.split(':');
+      const userId = parts[1];
+      const idx = parseInt(parts[2], 10);
+
+      if (interaction.user.id !== userId) {
+        return interaction.reply({ content: '❌ Esta garagem não é sua.', flags: MessageFlags.Ephemeral });
+      }
+
+      const veiculos = buscarVeiculosPorProprietario(userId);
+      if (!veiculos[idx]) return interaction.reply({ content: '❌ Veículo não encontrado.', flags: MessageFlags.Ephemeral });
+
+      return interaction.update(buildCard(veiculos, idx, userId));
     }
 
     // ── Botão: Transferir (direto do registro) ───────────────────────────────
