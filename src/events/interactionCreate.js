@@ -3,7 +3,8 @@ const path = require('path');
 const { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
 const { buscarVeiculoPorVin, atualizarVeiculo, buscarVeiculosPorProprietario } = require('../services/database/db');
 const { buildCard } = require('../commands/public/garagem');
-const { msgTransferencia } = require('../utils/formatter');
+const { msgTransferencia, msgRegistroOficial } = require('../utils/formatter');
+const { parsearUrlDiscord } = require('../utils/valorParser');
 const { canalRegistroVeicularId } = require('../config/config');
 const { notificar911 } = require('../services/notificar911');
 
@@ -146,9 +147,24 @@ module.exports = {
       }
 
       const exProprietarioId = veiculo.comprador_id;
-      const historico = [...veiculo.historico_proprietarios, { id: novoId, desde: Date.now() }];
+      const historico = [...(veiculo.historico_proprietarios || []), { id: novoId, desde: Date.now() }];
 
       atualizarVeiculo(vin, { comprador_id: novoId, historico_proprietarios: historico });
+
+      // Edita a mensagem de registro original para refletir o novo proprietário
+      if (veiculo.link_registro) {
+        try {
+          const { channelId, messageId } = parsearUrlDiscord(veiculo.link_registro);
+          const canalReg = await interaction.client.channels.fetch(channelId);
+          const msgReg = await canalReg.messages.fetch(messageId);
+          const veiculoAtualizado = { ...veiculo, comprador_id: novoId, historico_proprietarios: historico };
+          // Atualiza ex-proprietário na seção pessoal
+          veiculoAtualizado._ex_proprietario_id = exProprietarioId;
+          await msgReg.edit(msgRegistroOficial(veiculoAtualizado));
+        } catch (e) {
+          console.error('[transferencia] Não foi possível editar o registro original:', e.message);
+        }
+      }
 
       const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
       await canal.send(msgTransferencia({

@@ -52,10 +52,11 @@ function msgRegistroOficial(v) {
   }
 
   // Seção pessoal
+  const exProp = v._ex_proprietario_id ? `<@${v._ex_proprietario_id}>` : 'N/A';
   components.push(text(
     `## ${carro} ${seta} Veículo ${v.tipo === 'empresarial' ? 'Empresarial' : 'Pessoal'}\n` +
     `> ${dot} **Proprietário:** <@${v.comprador_id}>\n` +
-    `> ${dot} **Ex-proprietário:** N/A`
+    `> ${dot} **Ex-proprietário:** ${exProp}`
   ));
   components.push(sep());
 
