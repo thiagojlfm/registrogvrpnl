@@ -43,8 +43,6 @@ async function sincronizarImportacoes(client) {
 
       if (!rawTexto.includes('IMPORTA')) continue;
 
-      console.log(`[sync/import] candidata id=${msg.id} flags=${msg.flags?.bitfield} isV2=${!!isV2}`);
-
       const dados = parsearMensagemImportacao(msg);
       console.log(`[sync/import] msg ${msg.id} → comprador_id=${dados.comprador_id} comprovante=${dados.comprovante} valor=${dados.valor_pago}`);
 
