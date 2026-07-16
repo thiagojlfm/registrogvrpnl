@@ -82,13 +82,22 @@ module.exports = {
 
     console.log(`[importacao] Pendente criado para ${dados.comprador_id} | VIN: ${vin}`);
 
-    await message.channel.send(
-      msgImportacaoRegistrada({
+    // Notifica no tópico da conce onde o !pay foi feito
+    try {
+      const canalNotif = await message.client.channels.fetch(ids.channelId);
+      await canalNotif.send(msgImportacaoRegistrada({
         compradorId: dados.comprador_id,
         veiculo: dados.veiculo || 'Desconhecido',
         modelo: dados.modelo || '',
         vin,
-      })
-    );
+      }));
+    } catch {
+      await message.channel.send(msgImportacaoRegistrada({
+        compradorId: dados.comprador_id,
+        veiculo: dados.veiculo || 'Desconhecido',
+        modelo: dados.modelo || '',
+        vin,
+      })).catch(() => {});
+    }
   },
 };

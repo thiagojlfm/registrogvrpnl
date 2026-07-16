@@ -77,13 +77,24 @@ async function sincronizarImportacoes(client) {
       compradoresAtivos.add(dados.comprador_id);
       gerados++;
 
-      // Notifica no canal de importações
-      await canal.send(msgImportacaoRegistrada({
-        compradorId: dados.comprador_id,
-        veiculo:     dados.veiculo  || 'Desconhecido',
-        modelo:      dados.modelo   || '',
-        vin,
-      })).catch(() => {});
+      // Notifica no tópico da conce (channelId do comprovante = thread onde o !pay foi feito)
+      try {
+        const canalNotif = await client.channels.fetch(ids.channelId);
+        await canalNotif.send(msgImportacaoRegistrada({
+          compradorId: dados.comprador_id,
+          veiculo:     dados.veiculo  || 'Desconhecido',
+          modelo:      dados.modelo   || '',
+          vin,
+        }));
+      } catch {
+        // Fallback: posta no canal de importações se não conseguir acessar o tópico
+        await canal.send(msgImportacaoRegistrada({
+          compradorId: dados.comprador_id,
+          veiculo:     dados.veiculo  || 'Desconhecido',
+          modelo:      dados.modelo   || '',
+          vin,
+        })).catch(() => {});
+      }
 
       console.log(`[sync/import] VIN ${vin} gerado para <@${dados.comprador_id}>`);
     }
