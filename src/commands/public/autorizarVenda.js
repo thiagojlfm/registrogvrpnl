@@ -163,8 +163,15 @@ module.exports = {
 
     console.log(`[autorizar_venda] Pendente criado para ${comprador.id} | VIN: ${vin} | Atendente: ${interaction.user.id}`);
 
-    // Registra comissão se houver cotação vinculada ao tópico
+    // Bloqueia se não houver cotação registrada no tópico
     const cotacao = getCotacao(topico.id);
+    if (!cotacao) {
+      return interaction.editReply({
+        content: '❌ Nenhuma cotação registrada neste tópico.\nUse **/cotacao** antes de autorizar a venda.',
+      });
+    }
+
+    // Registra comissão vinculada à cotação
     if (cotacao) {
       const valorCentavos = normalizarValor(valorPago) || cotacao.valor_centavos;
       const comissaoCentavos = Math.round(valorCentavos * 0.02);

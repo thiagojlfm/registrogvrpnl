@@ -50,17 +50,9 @@ module.exports = {
           {
             type: 10,
             content:
-              `## ${infoAlt} COTAÇÃO DE VEÍCULO\n` +
-              `-# Emitida por <@${interaction.user.id}>`,
-          },
-          { type: 14, divider: true, spacing: 1 },
-          {
-            type: 10,
-            content:
-              `## ${carro} ${seta} Valor\n` +
-              `> ${dot} **Valor cotado:** ${valorFormatado}\n` +
-              (obs ? `> ${rpw} **Observação:** ${obs}\n` : '') +
-              `-# Esta cotação é válida enquanto este tópico estiver ativo.`,
+              `## 💰 ${valorFormatado}\n` +
+              (obs ? `> ${obs}\n` : '') +
+              `-# Cotado por <@${interaction.user.id}>`,
           },
         ],
       }],
