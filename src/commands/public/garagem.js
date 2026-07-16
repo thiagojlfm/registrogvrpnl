@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { buscarVeiculosPorProprietario } = require('../../services/database/db');
 const { cores, emojis: em } = require('../../config/config');
+const { sincronizarCanal } = require('../../utils/syncCanal');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -8,10 +9,18 @@ module.exports = {
     .setDescription('Abre sua garagem e transfere um veículo para outro usuário.'),
 
   async execute(interaction) {
-    const veiculos = buscarVeiculosPorProprietario(interaction.user.id);
+    await interaction.deferReply({ ephemeral: false });
+
+    let veiculos = buscarVeiculosPorProprietario(interaction.user.id);
+
+    // Se não achou nada, escaneia o canal e tenta de novo
+    if (veiculos.length === 0) {
+      await sincronizarCanal(interaction.client);
+      veiculos = buscarVeiculosPorProprietario(interaction.user.id);
+    }
 
     if (veiculos.length === 0) {
-      return interaction.reply({
+      return interaction.editReply({
         flags: MessageFlags.IsComponentsV2,
         components: [{
           type: 17,
@@ -82,7 +91,7 @@ module.exports = {
       components.push({ type: 14, divider: true, spacing: 1 });
     }
 
-    return interaction.reply({
+    return interaction.editReply({
       flags: MessageFlags.IsComponentsV2,
       components: [{
         type: 17,
