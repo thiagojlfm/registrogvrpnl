@@ -178,15 +178,21 @@ async function logApagouRegistro(client, { veiculo: v }) {
           components: [
             {
               type: 2,
-              style: 4,
-              label: '🗑️ Apagar do banco de dados',
-              custom_id: `btn_apagar_db:${v.vin}`,
+              style: 3,
+              label: '↩️ Restaurar registro',
+              custom_id: `btn_restaurar_registro:${v.vin}`,
             },
             {
               type: 2,
               style: 2,
               label: 'Manter no banco de dados',
               custom_id: `btn_manter_db:${v.vin}`,
+            },
+            {
+              type: 2,
+              style: 4,
+              label: '🗑️ Apagar do banco de dados',
+              custom_id: `btn_apagar_db:${v.vin}`,
             },
           ],
         },

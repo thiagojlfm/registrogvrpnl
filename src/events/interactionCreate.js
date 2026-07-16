@@ -104,6 +104,45 @@ module.exports = {
       return abrirModalTransferencia(interaction, vin);
     }
 
+    // ── Botão: Restaurar registro no canal ───────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith('btn_restaurar_registro:')) {
+      const { MessageFlags } = require('discord.js');
+      const { canalRegistroVeicularId } = require('../config/config');
+      const vin = interaction.customId.split(':')[1];
+      const veiculo = buscarVeiculoPorVin(vin);
+
+      if (!veiculo) {
+        return interaction.reply({ content: '❌ Veículo não encontrado no banco de dados.', flags: MessageFlags.Ephemeral });
+      }
+
+      // Reosta no canal de registro e atualiza link_registro
+      const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
+      const novaMsg = await canal.send(msgRegistroOficial(veiculo));
+      const novoLink = `https://discord.com/channels/${novaMsg.guildId}/${canal.id}/${novaMsg.id}`;
+      atualizarVeiculo(vin, { link_registro: novoLink });
+
+      await interaction.update({
+        flags: MessageFlags.IsComponentsV2,
+        components: [{
+          type: 17,
+          accent_color: cores.verde,
+          components: [
+            {
+              type: 10,
+              content:
+                `## ↩️ REGISTRO RESTAURADO\n` +
+                `> **Restaurado por:** <@${interaction.user.id}>\n` +
+                `> **Veículo:** ${veiculo.veiculo} — Placa: \`${veiculo.placa}\`\n` +
+                `> **Novo link:** ${novoLink}`,
+            },
+            { type: 14, divider: true, spacing: 1 },
+            { type: 10, content: `-# Ação confirmada · ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}` },
+          ],
+        }],
+      });
+      return;
+    }
+
     // ── Botão: Apagar do banco de dados (após registro deletado do canal) ────
     if (interaction.isButton() && interaction.customId.startsWith('btn_apagar_db:')) {
       const vin = interaction.customId.split(':')[1];
