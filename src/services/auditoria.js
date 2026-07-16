@@ -1,110 +1,136 @@
 const { MessageFlags } = require('discord.js');
-const { canalAuditoriaId, cores, emojis: em } = require('../config/config');
+const { canalAuditoriaId, cores, emojis: e } = require('../config/config');
 
+const { carro, info, infoAlt, sim, vendido, seta, dot, rpc2, rpw, rpc } = e || {};
+
+function text(content) { return { type: 10, content }; }
+function sep() { return { type: 14, divider: true, spacing: 1 }; }
+function container(cor, components) { return { type: 17, accent_color: cor, components }; }
+function v2() { return MessageFlags.IsComponentsV2; }
 function ts() {
   return new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 }
 
-async function logAuditoria(client, payload) {
+async function postar(client, payload) {
   if (!canalAuditoriaId) return;
   try {
     const canal = await client.channels.fetch(canalAuditoriaId);
     await canal.send(payload);
-  } catch (e) {
-    console.error('[auditoria] Erro ao postar log:', e.message);
+  } catch (err) {
+    console.error('[auditoria] Erro ao postar:', err.message);
   }
 }
 
-async function logRegistro(client, { veiculo, registradorId, linkRegistro }) {
-  await logAuditoria(client, {
-    flags: MessageFlags.IsComponentsV2,
-    components: [{
-      type: 17,
-      accent_color: cores.verde,
-      components: [
-        {
-          type: 10,
-          content:
-            `## ${em.sim} REGISTRO\n` +
-            `> ${em.dot} **Proprietário:** <@${registradorId}>\n` +
-            `> ${em.rpc2} **Veículo:** ${veiculo.veiculo} ${veiculo.modelo || ''}\n` +
-            `> ${em.rpw} **Placa:** \`${veiculo.placa}\`\n` +
-            `> ${em.rpc} **VIN:** \`${veiculo.vin}\`\n` +
-            `> ${em.dot} **Registro:** ${linkRegistro}\n` +
-            `-# ${ts()}`,
-        },
-      ],
-    }],
+// ── Registro novo ─────────────────────────────────────────────────────────────
+
+async function logRegistro(client, { veiculo: v, registradorId, linkRegistro }) {
+  await postar(client, {
+    flags: v2(),
+    components: [container(cores.verde, [
+      text(`## ${sim} REGISTRO DE VEÍCULO`),
+      sep(),
+      text(
+        `## ${carro} ${seta} Proprietário\n` +
+        `> ${dot} **Registrado por:** <@${registradorId}>`
+      ),
+      sep(),
+      text(
+        `## ${info} ${seta} Informações do veículo\n` +
+        `> ${rpc2} **Ano, marca, modelo:** ${v.veiculo}\n` +
+        `> ${rpw} **Versão:** ${v.modelo || 'N/A'}\n` +
+        `> ${rpw} **Coloração:** ${v.cor}\n` +
+        `> ${rpw} **Classe:** ${v.classe || 'N/A'}\n` +
+        `> ${rpw} **Placa:** ${v.placa}\n` +
+        `> ${rpc} **VIN Number:** ${v.vin}`
+      ),
+      sep(),
+      text(
+        `## ${infoAlt} ${seta} Comprovantes\n` +
+        `> ${dot} **Cotação:** ${v.link_cotacao || 'N/A'}\n` +
+        `> ${dot} **Pagamento:** ${v.comprovante || 'N/A'}\n` +
+        `> ${dot} **Registro oficial:** ${linkRegistro}`
+      ),
+      sep(),
+      text(`-# Log gerado automaticamente · ${ts()}`),
+    ])],
   });
 }
 
-async function logTransferencia(client, { veiculo, exProprietarioId, novoProprietarioId, comprovante }) {
-  await logAuditoria(client, {
-    flags: MessageFlags.IsComponentsV2,
-    components: [{
-      type: 17,
-      accent_color: cores.amarelo,
-      components: [
-        {
-          type: 10,
-          content:
-            `## ${em.vendido} TRANSFERÊNCIA\n` +
-            `> ${em.rpc2} **Veículo:** ${veiculo.veiculo} ${veiculo.modelo || ''}\n` +
-            `> ${em.rpw} **Placa:** \`${veiculo.placa}\`\n` +
-            `> ${em.rpc} **VIN:** \`${veiculo.vin}\`\n` +
-            `> ${em.dot} **Vendedor:** <@${exProprietarioId}>\n` +
-            `> ${em.dot} **Comprador:** <@${novoProprietarioId}>\n` +
-            `> ${em.dot} **Comprovante:** ${comprovante}\n` +
-            (veiculo.link_registro ? `> ${em.dot} **Registro:** ${veiculo.link_registro}\n` : '') +
-            `-# ${ts()}`,
-        },
-      ],
-    }],
+// ── Transferência ─────────────────────────────────────────────────────────────
+
+async function logTransferencia(client, { veiculo: v, exProprietarioId, novoProprietarioId, comprovante }) {
+  await postar(client, {
+    flags: v2(),
+    components: [container(cores.amarelo, [
+      text(`## ${vendido} TRANSFERÊNCIA DE VEÍCULO`),
+      sep(),
+      text(
+        `## ${carro} ${seta} Veículo\n` +
+        `> ${rpc2} **Ano, marca, modelo:** ${v.veiculo}\n` +
+        `> ${rpw} **Versão:** ${v.modelo || 'N/A'}\n` +
+        `> ${rpw} **Placa:** ${v.placa}\n` +
+        `> ${rpc} **VIN Number:** ${v.vin}`
+      ),
+      sep(),
+      text(
+        `## ${infoAlt} ${seta} Proprietários\n` +
+        `> ${dot} **Vendedor:** <@${exProprietarioId}>\n` +
+        `> ${dot} **Comprador:** <@${novoProprietarioId}>`
+      ),
+      sep(),
+      text(
+        `## ${info} ${seta} Pagamento\n` +
+        `> ${dot} **Comprovante:** ${comprovante}\n` +
+        (v.link_registro ? `> ${dot} **Registro:** ${v.link_registro}\n` : '') +
+        `-# Log gerado automaticamente · ${ts()}`
+      ),
+    ])],
   });
 }
 
-async function logEdicaoFoto(client, { veiculo, editorId, fotoAntiga, fotoNova }) {
-  await logAuditoria(client, {
-    flags: MessageFlags.IsComponentsV2,
-    components: [{
-      type: 17,
-      accent_color: cores.azul,
-      components: [
-        {
-          type: 10,
-          content:
-            `## ${em.info} EDIÇÃO DE FOTO\n` +
-            `> ${em.dot} **Editado por:** <@${editorId}>\n` +
-            `> ${em.rpc2} **Veículo:** ${veiculo.veiculo} ${veiculo.modelo || ''}\n` +
-            `> ${em.rpw} **Placa:** \`${veiculo.placa}\`\n` +
-            `> ${em.rpc} **VIN:** \`${veiculo.vin}\`\n` +
-            (fotoAntiga ? `> ${em.dot} **Foto anterior:** [Ver](${fotoAntiga})\n` : '') +
-            `> ${em.dot} **Nova foto:** [Ver](${fotoNova})\n` +
-            `-# ${ts()}`,
-        },
-      ],
-    }],
+// ── Edição de foto ────────────────────────────────────────────────────────────
+
+async function logEdicaoFoto(client, { veiculo: v, editorId, fotoAntiga, fotoNova }) {
+  await postar(client, {
+    flags: v2(),
+    components: [container(cores.azul, [
+      text(`## ${info} EDIÇÃO DE FOTO`),
+      sep(),
+      text(
+        `## ${carro} ${seta} Veículo\n` +
+        `> ${rpc2} **Ano, marca, modelo:** ${v.veiculo}\n` +
+        `> ${rpw} **Placa:** ${v.placa}\n` +
+        `> ${rpc} **VIN Number:** ${v.vin}`
+      ),
+      sep(),
+      text(
+        `## ${infoAlt} ${seta} Alteração\n` +
+        `> ${dot} **Editado por:** <@${editorId}>\n` +
+        (fotoAntiga ? `> ${dot} **Foto anterior:** [Ver](${fotoAntiga})\n` : '') +
+        `> ${dot} **Nova foto:** [Ver](${fotoNova})`
+      ),
+      sep(),
+      text(`-# Log gerado automaticamente · ${ts()}`),
+    ])],
   });
 }
+
+// ── Sync no deploy ────────────────────────────────────────────────────────────
 
 async function logDeploy(client, { novos, removidos }) {
   if (novos === 0 && removidos === 0) return;
-  await logAuditoria(client, {
-    flags: MessageFlags.IsComponentsV2,
-    components: [{
-      type: 17,
-      accent_color: cores.azul,
-      components: [
-        {
-          type: 10,
-          content:
-            `## 🔄 SYNC NO DEPLOY\n` +
-            `> ${em.dot} **Novos importados:** ${novos}\n` +
-            `> ${em.dot} **Removidos (reg apagado):** ${removidos}\n` +
-            `-# ${ts()}`,
-        },
-      ],
-    }],
+  await postar(client, {
+    flags: v2(),
+    components: [container(cores.azul, [
+      text(`## 🔄 SYNC NO DEPLOY`),
+      sep(),
+      text(
+        `> ${dot} **Veículos importados:** ${novos}\n` +
+        `> ${dot} **Removidos (registro apagado):** ${removidos}`
+      ),
+      sep(),
+      text(`-# Log gerado automaticamente · ${ts()}`),
+    ])],
   });
 }
 
