@@ -15,11 +15,11 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: false });
+    await interaction.deferReply();
 
     // Verificação de cargo
     if (cargoAtendente && !interaction.member.roles.cache.has(cargoAtendente)) {
-      return interaction.editReply({ content: '❌ Você não tem permissão para autorizar vendas.', ephemeral: true });
+      return interaction.editReply({ content: '❌ Você não tem permissão para autorizar vendas.', flags: MessageFlags.Ephemeral });
     }
 
     const comprador = interaction.options.getUser('comprador');

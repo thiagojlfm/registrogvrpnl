@@ -95,10 +95,10 @@ module.exports = {
       const veiculo = buscarVeiculoPorVin(vin);
 
       if (!veiculo || !veiculo.ativo) {
-        return interaction.reply({ content: '❌ Veículo não encontrado.', ephemeral: true });
+        return interaction.reply({ content: '❌ Veículo não encontrado.', flags: MessageFlags.Ephemeral });
       }
       if (veiculo.comprador_id !== interaction.user.id) {
-        return interaction.reply({ content: '❌ Apenas o proprietário registrado pode transferir este veículo.', ephemeral: true });
+        return interaction.reply({ content: '❌ Apenas o proprietário registrado pode transferir este veículo.', flags: MessageFlags.Ephemeral });
       }
 
       return abrirModalTransferencia(interaction, vin);
@@ -127,7 +127,7 @@ module.exports = {
         const found = members.find(m =>
           m.user.username.toLowerCase() === query.toLowerCase() ||
           m.displayName.toLowerCase() === query.toLowerCase()
-        ) || members.first();
+        );
         if (found) novoId = found.id;
       }
 

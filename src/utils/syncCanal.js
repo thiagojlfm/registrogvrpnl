@@ -139,6 +139,24 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
     if (mensagens.size < 100) break;
   }
 
+  // Aplica transferências ao banco SEMPRE (independente de reconciliar)
+  let atualizados = 0;
+  for (const [vin, t] of transferenciasNoCanal) {
+    const vDb = vinsExistentes.get(vin);
+    if (!vDb) continue;
+    if (vDb.comprador_id !== t.novoProprietarioId) {
+      const historico = [
+        ...(vDb.historico_proprietarios || []),
+        { id: t.novoProprietarioId, desde: Date.now() },
+      ];
+      vDb.comprador_id = t.novoProprietarioId;
+      vDb.historico_proprietarios = historico;
+      atualizarVeiculo(vin, { comprador_id: t.novoProprietarioId, historico_proprietarios: historico });
+      atualizados++;
+    }
+  }
+  if (atualizados > 0) console.log(`[sync] ${atualizados} proprietário(s) atualizados via transferência.`);
+
   let removidos = 0;
   let lista = [...vinsExistentes.values()];
 
@@ -148,46 +166,25 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
     lista = lista.filter(v => vinsNoCanal.has(v.vin));
     removidos = antes - lista.length;
 
-    // Atualiza proprietário no banco e edita a mensagem de registro
-    // para cada transferência que ainda não estava refletida
-    let atualizados = 0;
+    // Edita mensagens de registro para refletir o proprietário atual
     for (const [vin, t] of transferenciasNoCanal) {
       const vDb = lista.find(v => v.vin === vin);
-      if (!vDb) continue;
-
-      // Se o proprietário no banco já é o comprador mais recente, apenas verifica a mensagem
-      if (vDb.comprador_id !== t.novoProprietarioId) {
-        const historico = [
-          ...(vDb.historico_proprietarios || []),
-          { id: t.novoProprietarioId, desde: Date.now() },
-        ];
-        vDb.comprador_id = t.novoProprietarioId;
-        vDb.historico_proprietarios = historico;
-        atualizarVeiculo(vin, { comprador_id: t.novoProprietarioId, historico_proprietarios: historico });
-        atualizados++;
-      }
-
-      // Edita a mensagem de registro para mostrar o proprietário atual
-      if (vDb.link_registro) {
-        try {
-          const urlMatch = vDb.link_registro.match(/discord\.com\/channels\/\d+\/(\d+)\/(\d+)/);
-          if (urlMatch) {
-            const canalReg = await client.channels.fetch(urlMatch[1]);
-            const msgReg   = await canalReg.messages.fetch(urlMatch[2]);
-            const payload  = msgRegistroOficial({
-              ...vDb,
-              comprador_id: t.novoProprietarioId,
-              _ex_proprietario_id: t.exProprietarioId,
-            });
-            await msgReg.edit(payload);
-          }
-        } catch (e) {
-          console.error(`[sync] Erro ao atualizar registro VIN ${vin}:`, e.message);
+      if (!vDb || !vDb.link_registro) continue;
+      try {
+        const urlMatch = vDb.link_registro.match(/discord\.com\/channels\/\d+\/(\d+)\/(\d+)/);
+        if (urlMatch) {
+          const canalReg = await client.channels.fetch(urlMatch[1]);
+          const msgReg   = await canalReg.messages.fetch(urlMatch[2]);
+          await msgReg.edit(msgRegistroOficial({
+            ...vDb,
+            comprador_id: t.novoProprietarioId,
+            _ex_proprietario_id: t.exProprietarioId,
+          }));
         }
+      } catch (e) {
+        console.error(`[sync] Erro ao editar registro VIN ${vin}:`, e.message);
       }
     }
-
-    if (atualizados > 0) console.log(`[sync] ${atualizados} registro(s) de proprietário atualizados.`);
   }
 
   if (novos > 0 || removidos > 0) {

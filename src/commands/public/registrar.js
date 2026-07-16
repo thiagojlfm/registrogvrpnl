@@ -54,7 +54,7 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: false });
+    await interaction.deferReply();
 
     const pendente = getPendente(interaction.user.id);
     if (!pendente) {
