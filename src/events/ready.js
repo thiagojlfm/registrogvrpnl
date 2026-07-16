@@ -30,6 +30,14 @@ module.exports = {
   once: true,
   async execute(client) {
     console.log(`[ready] Logado como ${client.user.tag}`);
+
+    // Diagnóstico de persistência do volume
+    const { dbPath } = require('../config/config');
+    const veiculosFile = path.join(dbPath, 'veiculos.json');
+    const existe = fs.existsSync(veiculosFile);
+    const tamanho = existe ? fs.statSync(veiculosFile).size : 0;
+    console.log(`[db] path=${dbPath} veiculos.json existe=${existe} tamanho=${tamanho}b`);
+
     await registrarComandos();
 
     // Sync no startup com reconciliação completa (adiciona novos e remove apagados)
