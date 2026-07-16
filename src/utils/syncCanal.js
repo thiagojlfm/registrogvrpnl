@@ -1,5 +1,6 @@
 const { canalRegistroVeicularId } = require('../config/config');
-const { lerVeiculos, salvarVeiculos } = require('../services/database/db');
+const { lerVeiculos, salvarVeiculos, atualizarVeiculo } = require('../services/database/db');
+const { msgRegistroOficial } = require('./formatter');
 
 function extrairTexto(components = []) {
   let texto = '';
@@ -21,13 +22,13 @@ function extrairFotoUrl(components = []) {
   return null;
 }
 
+function strip(s) { return s ? s.replace(/\*\*/g, '').trim() : s; }
+
 function parsearRegistro(texto, msgUrl, msgTimestamp, rawComponents) {
   const get = (pattern) => {
     const m = texto.match(pattern);
     return m ? m[1].trim() : null;
   };
-
-  const strip = (s) => s ? s.replace(/\*\*/g, '').trim() : s;
 
   const compradorId = get(/<@(\d+)>/);
   const vin         = get(/VIN Number[:\s*`]+([0-9]+)/);
@@ -36,16 +37,12 @@ function parsearRegistro(texto, msgUrl, msgTimestamp, rawComponents) {
   const modelo      = strip(get(/Versão[:\s]+(.+)/));
   const cor         = strip(get(/Coloração[:\s]+(.+)/));
   const classe      = strip(get(/Classe[:\s]+(?!N\/A)(.+)/));
-
-  // Empresarial
   const empresa     = get(/Nome da empresa[:\s]+(.+)/);
   const empresaLink = get(/Link do registro da empresa[:\s]+(.+)/);
   const finalidade  = get(/Finalidade[:\s]+(.+)/);
   const tipo        = empresa ? 'empresarial' : 'pessoal';
-
-  // Comprovantes
-  const linkCotacao        = get(/Cotação\/Orçamento[:\s]+(https?:\/\/\S+)/);
-  const comprovante        = get(/Comprovante de Pagamento[:\s]+(https?:\/\/\S+)/);
+  const linkCotacao         = get(/Cotação\/Orçamento[:\s]+(https?:\/\/\S+)/);
+  const comprovante         = get(/Comprovante de Pagamento[:\s]+(https?:\/\/\S+)/);
   const comprovanteRecompra = get(/Recompra[^:]*[:\s]+(https?:\/\/\S+)/);
 
   if (!compradorId || !vin || !placa) return null;
@@ -76,13 +73,32 @@ function parsearRegistro(texto, msgUrl, msgTimestamp, rawComponents) {
   };
 }
 
+// Extrai VIN + novo proprietário de uma mensagem de TRANSFERÊNCIA
+function parsearTransferencia(texto) {
+  const get = (pattern) => {
+    const m = texto.match(pattern);
+    return m ? m[1].trim() : null;
+  };
+  const vin = get(/VIN Number[:\s*`]+([0-9]+)/);
+  // "Comprador: <@id>" aparece depois de "Vendedor"
+  const compradorMatch = texto.match(/Comprador[:\s]+<@(\d+)>/);
+  const vendedorMatch  = texto.match(/Vendedor[:\s]+<@(\d+)>/);
+  if (!vin || !compradorMatch) return null;
+  return {
+    vin,
+    novoProprietarioId: compradorMatch[1],
+    exProprietarioId: vendedorMatch ? vendedorMatch[1] : null,
+  };
+}
+
 async function sincronizarCanal(client, { reconciliar = false } = {}) {
   const canal = await client.channels.fetch(canalRegistroVeicularId);
   const veiculosExistentes = lerVeiculos();
   const vinsExistentes = new Map(veiculosExistentes.map(v => [v.vin, v]));
-
-  // VINs encontrados no canal (usado só se reconciliar=true)
   const vinsNoCanal = new Set();
+
+  // Mapa vin → última transferência encontrada no canal (mais recente primeiro)
+  const transferenciasNoCanal = new Map();
 
   let novos = 0;
   let before = undefined;
@@ -99,16 +115,23 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
       if (!msg.components?.length) continue;
 
       const texto = extrairTexto(msg.components);
-      if (!texto.includes('VEÍCULO REGISTRADO')) continue;
 
-      const registro = parsearRegistro(texto, msg.url, msg.createdTimestamp, msg.components);
-      if (!registro) continue;
+      if (texto.includes('VEÍCULO REGISTRADO')) {
+        const registro = parsearRegistro(texto, msg.url, msg.createdTimestamp, msg.components);
+        if (!registro) continue;
+        if (reconciliar) vinsNoCanal.add(registro.vin);
+        if (!vinsExistentes.has(registro.vin)) {
+          vinsExistentes.set(registro.vin, registro);
+          novos++;
+        }
+      }
 
-      if (reconciliar) vinsNoCanal.add(registro.vin);
-
-      if (!vinsExistentes.has(registro.vin)) {
-        vinsExistentes.set(registro.vin, registro);
-        novos++;
+      if (texto.includes('TRANSFERÊNCIA DE VEÍCULO')) {
+        const t = parsearTransferencia(texto);
+        // Guarda apenas a mais recente (mensagens vêm da mais nova para mais antiga)
+        if (t && !transferenciasNoCanal.has(t.vin)) {
+          transferenciasNoCanal.set(t.vin, t);
+        }
       }
     }
 
@@ -119,16 +142,57 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
   let removidos = 0;
   let lista = [...vinsExistentes.values()];
 
-  // Remove do banco veículos cujos registros foram apagados do canal
   if (reconciliar) {
+    // Remove veículos sem registro no canal
     const antes = lista.length;
     lista = lista.filter(v => vinsNoCanal.has(v.vin));
     removidos = antes - lista.length;
+
+    // Atualiza proprietário no banco e edita a mensagem de registro
+    // para cada transferência que ainda não estava refletida
+    let atualizados = 0;
+    for (const [vin, t] of transferenciasNoCanal) {
+      const vDb = lista.find(v => v.vin === vin);
+      if (!vDb) continue;
+
+      // Se o proprietário no banco já é o comprador mais recente, apenas verifica a mensagem
+      if (vDb.comprador_id !== t.novoProprietarioId) {
+        const historico = [
+          ...(vDb.historico_proprietarios || []),
+          { id: t.novoProprietarioId, desde: Date.now() },
+        ];
+        vDb.comprador_id = t.novoProprietarioId;
+        vDb.historico_proprietarios = historico;
+        atualizarVeiculo(vin, { comprador_id: t.novoProprietarioId, historico_proprietarios: historico });
+        atualizados++;
+      }
+
+      // Edita a mensagem de registro para mostrar o proprietário atual
+      if (vDb.link_registro) {
+        try {
+          const urlMatch = vDb.link_registro.match(/discord\.com\/channels\/\d+\/(\d+)\/(\d+)/);
+          if (urlMatch) {
+            const canalReg = await client.channels.fetch(urlMatch[1]);
+            const msgReg   = await canalReg.messages.fetch(urlMatch[2]);
+            const payload  = msgRegistroOficial({
+              ...vDb,
+              comprador_id: t.novoProprietarioId,
+              _ex_proprietario_id: t.exProprietarioId,
+            });
+            await msgReg.edit(payload);
+          }
+        } catch (e) {
+          console.error(`[sync] Erro ao atualizar registro VIN ${vin}:`, e.message);
+        }
+      }
+    }
+
+    if (atualizados > 0) console.log(`[sync] ${atualizados} registro(s) de proprietário atualizados.`);
   }
 
   if (novos > 0 || removidos > 0) {
     salvarVeiculos(lista);
-    if (novos > 0) console.log(`[sync] ${novos} veículo(s) importado(s) do canal.`);
+    if (novos > 0)     console.log(`[sync] ${novos} veículo(s) importado(s) do canal.`);
     if (removidos > 0) console.log(`[sync] ${removidos} veículo(s) removido(s) (registro apagado do canal).`);
   }
 
@@ -143,17 +207,12 @@ function agendarSyncMeiaNoite(client) {
 
   setTimeout(() => {
     sincronizarCanal(client, { reconciliar: true })
-      .then(({ novos, removidos }) =>
-        console.log(`[sync/noturno] novos=${novos} removidos=${removidos}`)
-      )
+      .then(({ novos, removidos }) => console.log(`[sync/noturno] novos=${novos} removidos=${removidos}`))
       .catch(err => console.error('[sync/noturno] Erro:', err));
 
-    // Repete a cada 24h a partir daí
     setInterval(() => {
       sincronizarCanal(client, { reconciliar: true })
-        .then(({ novos, removidos }) =>
-          console.log(`[sync/noturno] novos=${novos} removidos=${removidos}`)
-        )
+        .then(({ novos, removidos }) => console.log(`[sync/noturno] novos=${novos} removidos=${removidos}`))
         .catch(err => console.error('[sync/noturno] Erro:', err));
     }, 24 * 60 * 60 * 1000);
   }, msAte);
