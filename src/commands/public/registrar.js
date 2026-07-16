@@ -120,8 +120,28 @@ module.exports = {
       modelo: `${pendente.veiculo} ${pendente.modelo}`.trim(),
     });
 
+    const { MessageFlags } = require('discord.js');
+    const { cores, emojis: em } = require('../../config/config');
     await interaction.editReply({
-      content: `✅ Veículo **${pendente.veiculo} ${pendente.modelo}** registrado com sucesso!\n🔗 ${linkRegistro}`,
+      flags: MessageFlags.IsComponentsV2,
+      components: [
+        {
+          type: 17,
+          accent_color: cores.verde,
+          components: [
+            {
+              type: 10,
+              content:
+                `## ${em.sim} VEÍCULO REGISTRADO COM SUCESSO\n` +
+                `> ${em.rpc2} **Veículo:** ${pendente.veiculo} ${pendente.modelo || ''}\n` +
+                `> ${em.rpw} **Placa:** ${placa}\n` +
+                `> ${em.rpc} **VIN:** \`${pendente.vin}\``,
+            },
+            { type: 14, divider: true, spacing: 1 },
+            { type: 10, content: `${em.dot} [Ver registro oficial](${linkRegistro})` },
+          ],
+        },
+      ],
     });
   },
 };
