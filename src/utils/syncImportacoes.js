@@ -1,7 +1,7 @@
 const { canalImportacaoId, idBotImportacao, idBotEconomia } = require('../config/config');
 const { lerVeiculos, lerPendentes, setPendente, lerImportsProcessados, marcarImportProcessado } = require('../services/database/db');
 const { parsearMensagemImportacao } = require('./parser');
-const { extrairValorEmbed, valoresConferem, parsearUrlDiscord } = require('./valorParser');
+const { parsearUrlDiscord } = require('./valorParser');
 const { gerarVin } = require('./vinGenerator');
 const { msgImportacaoRegistrada } = require('./formatter');
 
@@ -54,36 +54,11 @@ async function sincronizarImportacoes(client) {
       const ids = parsearUrlDiscord(dados.comprovante);
       if (!ids) continue;
 
-      let valorOk = false;
+      // Verifica apenas se o comprovante é acessível — valor já vem validado na msg da importação
       try {
         const canalComp = await client.channels.fetch(ids.channelId);
-        const msgComp   = await canalComp.messages.fetch(ids.messageId);
-        if (msgComp.author.id === idBotEconomia) {
-          // Comprovante do bot de economia → valida valor (embed ou V2)
-          let valorComp = null;
-          const embed = msgComp.embeds?.[0];
-          if (embed) valorComp = extrairValorEmbed(embed);
-          if (!valorComp) {
-            try {
-              const raw = msgComp.toJSON?.() ?? {};
-              const textoV2 = JSON.stringify(raw.components || raw.embeds || '');
-              const match = textoV2.match(/\$\s*[\d,. ]+/);
-              if (match) valorComp = match[0].replace(/\s/g, '');
-            } catch {}
-          }
-          if (!valorComp && msgComp.content) {
-            const match = msgComp.content.match(/\$\s*[\d,. ]+/);
-            if (match) valorComp = match[0].replace(/\s/g, '');
-          }
-          valorOk = !dados.valor_pago || valoresConferem(valorComp, dados.valor_pago);
-        } else {
-          // Comprovante aponta para mensagem do atendente/bot interno → importação já foi
-          // validada manualmente, aceita sem comparação de valor
-          valorOk = true;
-        }
+        await canalComp.messages.fetch(ids.messageId);
       } catch { continue; }
-
-      if (!valorOk) continue;
 
       // Tudo ok — gera VIN, salva pendente e marca import como processado
       const vin = gerarVin();
