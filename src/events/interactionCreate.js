@@ -1,12 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
-const { buscarVeiculoPorVin, atualizarVeiculo, buscarVeiculosPorProprietario } = require('../services/database/db');
+const { buscarVeiculoPorVin, atualizarVeiculo, buscarVeiculosPorProprietario, removerVeiculo } = require('../services/database/db');
 const { buildCard } = require('../commands/public/garagem');
 const { msgRegistroOficial, msgConfirmacaoTransferencia } = require('../utils/formatter');
 const { parsearUrlDiscord } = require('../utils/valorParser');
 const { notificar911 } = require('../services/notificar911');
 const { logTransferencia } = require('../services/auditoria');
+const { cores, emojis: em } = require('../config/config');
 
 const comandos = new Map();
 
@@ -101,6 +102,64 @@ module.exports = {
       }
 
       return abrirModalTransferencia(interaction, vin);
+    }
+
+    // ── Botão: Apagar do banco de dados (após registro deletado do canal) ────
+    if (interaction.isButton() && interaction.customId.startsWith('btn_apagar_db:')) {
+      const vin = interaction.customId.split(':')[1];
+      const veiculo = buscarVeiculoPorVin(vin);
+      removerVeiculo(vin);
+
+      // Edita a mensagem de auditoria removendo os botões e confirmando
+      await interaction.update({
+        flags: require('discord.js').MessageFlags.IsComponentsV2,
+        components: [
+          {
+            type: 17,
+            accent_color: cores.vermelho,
+            components: [
+              {
+                type: 10,
+                content:
+                  `## 🗑️ REGISTRO REMOVIDO DO BANCO DE DADOS\n` +
+                  `> **Removido por:** <@${interaction.user.id}>\n` +
+                  (veiculo ? `> **Veículo:** ${veiculo.veiculo} — Placa: ${veiculo.placa} — VIN: \`${veiculo.vin}\`` : `> VIN: \`${vin}\``),
+              },
+              { type: 14, divider: true, spacing: 1 },
+              { type: 10, content: `-# Ação confirmada · ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}` },
+            ],
+          },
+        ],
+      });
+      return;
+    }
+
+    // ── Botão: Manter no banco de dados ──────────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith('btn_manter_db:')) {
+      const vin = interaction.customId.split(':')[1];
+      const veiculo = buscarVeiculoPorVin(vin);
+
+      await interaction.update({
+        flags: require('discord.js').MessageFlags.IsComponentsV2,
+        components: [
+          {
+            type: 17,
+            accent_color: cores.azul,
+            components: [
+              {
+                type: 10,
+                content:
+                  `## ✅ REGISTRO MANTIDO NO BANCO DE DADOS\n` +
+                  `> **Decisão de:** <@${interaction.user.id}>\n` +
+                  (veiculo ? `> **Veículo:** ${veiculo.veiculo} — Placa: ${veiculo.placa} — VIN: \`${veiculo.vin}\`` : `> VIN: \`${vin}\``),
+              },
+              { type: 14, divider: true, spacing: 1 },
+              { type: 10, content: `-# Ação confirmada · ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}` },
+            ],
+          },
+        ],
+      });
+      return;
     }
 
     // ── Modal: confirmar transferência ───────────────────────────────────────

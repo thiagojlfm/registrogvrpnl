@@ -153,4 +153,49 @@ async function logPendente(client, { comprador_id, pendente }) {
   });
 }
 
-module.exports = { logRegistro, logTransferencia, logEdicaoFoto, logDeploy, logPendente };
+// ── Registro apagado do canal ─────────────────────────────────────────────────
+
+async function logApagouRegistro(client, { veiculo: v }) {
+  if (!canalAuditoriaId) return;
+  try {
+    const canal = await client.channels.fetch(canalAuditoriaId);
+    await canal.send({
+      flags: v2(),
+      components: [container(cores.vermelho, [
+        text(
+          `## 🗑️ REGISTRO APAGADO DO CANAL\n` +
+          `> ${dot} **Proprietário:** <@${v.comprador_id}>\n` +
+          `> ${rpc2} **Veículo:** ${v.veiculo} ${v.modelo || ''}\n` +
+          `> ${rpw} **Placa:** ${v.placa}\n` +
+          `> ${rpc} **VIN:** \`${v.vin}\``
+        ),
+        sep(),
+        text(`-# O veículo ainda existe no banco de dados. Deseja removê-lo também?`),
+        sep(),
+        {
+          type: 1,
+          components: [
+            {
+              type: 2,
+              style: 4,
+              label: '🗑️ Apagar do banco de dados',
+              custom_id: `btn_apagar_db:${v.vin}`,
+            },
+            {
+              type: 2,
+              style: 2,
+              label: 'Manter no banco de dados',
+              custom_id: `btn_manter_db:${v.vin}`,
+            },
+          ],
+        },
+        sep(),
+        text(`-# Log gerado automaticamente · ${ts()}`),
+      ])],
+    });
+  } catch (err) {
+    console.error('[auditoria] Erro ao logar apagar registro:', err.message);
+  }
+}
+
+module.exports = { logRegistro, logTransferencia, logEdicaoFoto, logDeploy, logPendente, logApagouRegistro };
