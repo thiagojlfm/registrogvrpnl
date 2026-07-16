@@ -47,28 +47,41 @@ module.exports = {
 
     const mensagensAntigas = todasMensagens; // alias para compatibilidade abaixo
 
-    // Fix 2: encontra confirmação de pagamento do UnbelievaBoat (máx 2h, qualquer formato)
     const agora = Date.now();
+
+    // Foca no !pay: busca o !pay mais recente nas mensagens do tópico (últimas 2h)
+    const msgPayCmd = [...todasMensagens].reverse().find(m => {
+      if (m.author.bot) return false;
+      if ((agora - m.createdTimestamp) > DOIS_HORAS_MS) return false;
+      return /^!pay\s+/i.test(m.content);
+    });
+
+    // Confirma que o pagamento foi aceito pelo bot de economia (após o !pay)
+    const timestampPay = msgPayCmd?.createdTimestamp || 0;
     const msgPagamento = todasMensagens.find(m => {
       if (m.author.id !== idBotEconomia) return false;
+      if (m.createdTimestamp < timestampPay) return false;
       if ((agora - m.createdTimestamp) > DOIS_HORAS_MS) return false;
       const textoEmbed = m.embeds?.[0]?.description || m.embeds?.[0]?.title || '';
-      const textoContent = m.content || '';
-      return textoEmbed.includes('has received') || textoContent.includes('has received');
+      return textoEmbed.includes('has received');
     });
 
     if (!msgPagamento) {
       return interaction.editReply({
-        content: '❌ Nenhuma confirmação de pagamento do sistema econômico encontrada neste tópico nas últimas 2 horas.',
+        content: '❌ Nenhuma confirmação de pagamento (`!pay`) encontrada neste tópico nas últimas 2 horas.',
       });
     }
 
-    // Extrai valor apenas da mensagem confirmada do UnbelievaBoat (embed + content)
-    const embed = msgPagamento.embeds?.[0];
-    let valorPago = embed ? extrairValorEmbed(embed) : null;
-    if (!valorPago && msgPagamento.content) {
-      const m = msgPagamento.content.match(/\$\s*[\d.,]+/);
-      if (m) valorPago = m[0].replace(/\s/g, '');
+    // Extrai valor: prioriza o !pay (mais confiável), fallback no embed do bot
+    let valorPago = null;
+    if (msgPayCmd) {
+      // !pay @alguem 1000  ou  !pay @alguem $1,000
+      const m = msgPayCmd.content.match(/!pay\s+\S+\s+\$?\s*([\d,._]+)/i);
+      if (m) valorPago = `$${m[1].replace(/[,._]/g, '')}`;
+    }
+    if (!valorPago) {
+      const embed = msgPagamento.embeds?.[0];
+      valorPago = embed ? extrairValorEmbed(embed) : null;
     }
 
     // Extrai veículo da mensagem que originou o tópico (cotação), pulando linhas de menção
