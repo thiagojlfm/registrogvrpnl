@@ -8,8 +8,9 @@ const { msgImportacaoRegistrada } = require('./formatter');
 async function sincronizarImportacoes(client) {
   if (!canalImportacaoId) return 0;
 
+  console.log(`[sync/import] iniciando — canal=${canalImportacaoId} idBotImportacao=${idBotImportacao}`);
   const canal = await client.channels.fetch(canalImportacaoId).catch(() => null);
-  if (!canal) return 0;
+  if (!canal) { console.log(`[sync/import] canal não encontrado`); return 0; }
 
   const veiculos   = lerVeiculos();
   const pendentes  = lerPendentes();
@@ -31,9 +32,11 @@ async function sincronizarImportacoes(client) {
     if (msgs.size === 0) break;
 
     for (const msg of msgs.values()) {
+      console.log(`[sync/import] msg author=${msg.author.id} embeds=${msg.embeds?.length} content="${msg.content?.slice(0,30)}"`);
       if (msg.author.id !== idBotImportacao) continue;
 
       const raw = JSON.stringify(msg.embeds || '') + (msg.content || '');
+      console.log(`[sync/import] raw snippet: ${raw.slice(0, 100)}`);
       if (!raw.includes('IMPORTA')) continue; // filtra rápido
 
       const dados = parsearMensagemImportacao(msg);
