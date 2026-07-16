@@ -1,5 +1,5 @@
-const { SlashCommandBuilder } = require('discord.js');
-const { idBotEconomia, cargoAtendente } = require('../../config/config');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { idBotEconomia, cargoAtendente, cores } = require('../../config/config');
 const { setPendente } = require('../../services/database/db');
 const { gerarVin } = require('../../utils/vinGenerator');
 const { extrairValorEmbed } = require('../../utils/valorParser');
@@ -30,24 +30,22 @@ module.exports = {
       return interaction.editReply({ content: '❌ Não foi possível acessar o canal/tópico atual.' });
     }
 
-    // Fix 1: busca as mensagens mais antigas primeiro (primeira msg do comprador = modelo do veículo)
-    let mensagensAntigas, mensagensRecentes;
+    // Busca a mensagem que originou o tópico (cotação da conce) e as mensagens dentro do tópico
+    let msgCotacao = null;
+    let todasMensagens = [];
     try {
-      const [colAntiga, colRecente] = await Promise.all([
-        topico.messages.fetch({ limit: 50, after: '0' }),
-        topico.messages.fetch({ limit: 50 }),
+      const [starter, colecao] = await Promise.all([
+        topico.fetchStarterMessage().catch(() => null),
+        topico.messages.fetch({ limit: 100 }),
       ]);
-      mensagensAntigas = [...colAntiga.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
-      mensagensRecentes = [...colRecente.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+      msgCotacao = starter;
+      todasMensagens = [...colecao.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
     } catch (err) {
       console.error('[autorizar_venda] Erro ao buscar histórico:', err.message);
       return interaction.editReply({ content: '❌ Não foi possível ler o histórico do tópico.' });
     }
 
-    // Deduplica unindo as duas buscas
-    const mapaMsg = new Map();
-    [...mensagensAntigas, ...mensagensRecentes].forEach(m => mapaMsg.set(m.id, m));
-    const todasMensagens = [...mapaMsg.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+    const mensagensAntigas = todasMensagens; // alias para compatibilidade abaixo
 
     // Fix 2: encontra confirmação de pagamento do UnbelievaBoat (máx 2h, qualquer formato)
     const agora = Date.now();
@@ -84,18 +82,18 @@ module.exports = {
       }
     }
 
-    // Fix 1: primeira mensagem do comprador — pula linhas que são só menções (@Usuario ou <@id>)
-    const primeiraMsgComprador = mensagensAntigas.find(m => m.author.id === comprador.id && m.content?.trim());
-    const linhasComprador = (primeiraMsgComprador?.content || '')
+    // Extrai veículo da mensagem que originou o tópico (cotação), pulando linhas de menção
+    const linhasCotacao = (msgCotacao?.content || '')
       .split('\n')
       .map(l => l.trim())
       .filter(l => l && !l.match(/^<@!?\d+>$/) && !l.startsWith('@'));
-    const veiculoTexto = linhasComprador[0] || 'Não identificado';
-    const modeloExtra = linhasComprador[1] || '';
+    const veiculoTexto = linhasCotacao[0] || 'Não identificado';
+    const modeloExtra = linhasCotacao[1] || '';
 
-    // Extrai foto do tópico (primeiro attachment de qualquer mensagem)
+    // Extrai foto: tenta primeiro na cotação, depois nas mensagens do tópico
     let fotoUrl = null;
-    for (const msg of todasMensagens) {
+    const fontesFoto = [msgCotacao, ...todasMensagens].filter(Boolean);
+    for (const msg of fontesFoto) {
       const att = msg.attachments.first();
       if (att && att.contentType?.startsWith('image/')) { fotoUrl = att.url; break; }
     }
@@ -134,12 +132,30 @@ module.exports = {
     console.log(`[autorizar_venda] Pendente criado para ${comprador.id} | VIN: ${vin} | Atendente: ${interaction.user.id}`);
 
     await interaction.editReply({
-      content:
-        `✅ Venda autorizada por <@${interaction.user.id}>.\n` +
-        `<@${comprador.id}>, use **/registrar_veiculo** com sua placa, cor e tipo para finalizar o registro.\n` +
-        `> **Veículo identificado:** ${veiculoNome} ${modeloNome}\n` +
-        `> **Valor pago:** ${valorPago || 'não identificado'}\n` +
-        `> **VIN gerado:** \`${vin}\``,
+      flags: MessageFlags.IsComponentsV2,
+      components: [
+        {
+          type: 17,
+          accent_color: cores.verde,
+          components: [
+            {
+              type: 10,
+              content:
+                `## <:SimGVRPNL:1228154618048155701> VENDA AUTORIZADA\n` +
+                `> **Comprador:** <@${comprador.id}>\n` +
+                `> **Autorizado por:** <@${interaction.user.id}>\n` +
+                `> **Veículo:** ${veiculoNome}${modeloNome ? ` — ${modeloNome}` : ''}\n` +
+                `> **Valor pago:** ${valorPago || 'não identificado'}\n` +
+                `> **VIN:** \`${vin}\``,
+            },
+            { type: 14, divider: true, spacing: 1 },
+            {
+              type: 10,
+              content: `<@${comprador.id}>, use **/registrar_veiculo** com sua placa, cor e foto para finalizar o registro oficial.`,
+            },
+          ],
+        },
+      ],
     });
   },
 };
