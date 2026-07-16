@@ -68,6 +68,11 @@ module.exports = {
       sub
         .setName('reset_testes')
         .setDescription('⚠️ Apaga TUDO: registros, garagens, auditoria e canal. Use só em testes.')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('sync_911')
+        .setDescription('Envia todos os veículos ativos ao 911-bot via canal de integração.')
     ),
 
   async execute(interaction) {
@@ -232,6 +237,36 @@ module.exports = {
       }
 
       return interaction.editReply({ content: `## 🧹 Reset concluído\n${etapas.join('\n')}` });
+    }
+
+    // ── sync_911 ─────────────────────────────────────────────────────────────
+    if (sub === 'sync_911') {
+      const { lerVeiculos: lv } = require('../../services/database/db');
+      const { notificar911 } = require('../../services/notificar911');
+      const ativos = lv().filter(v => v.ativo);
+
+      if (!process.env.CANAL_INTEGRACAO_911_ID) {
+        return interaction.editReply({ content: '❌ `CANAL_INTEGRACAO_911_ID` não configurado no .env.' });
+      }
+
+      await interaction.editReply({ content: `⏳ Sincronizando ${ativos.length} veículo(s) com o 911-bot...` });
+
+      let ok = 0;
+      for (const v of ativos) {
+        await notificar911(interaction.client, {
+          tipo: 'registro',
+          discord_id_novo: v.comprador_id,
+          discord_id_anterior: null,
+          placa: v.placa,
+          vin: v.vin,
+          modelo: `${v.veiculo} ${v.modelo || ''}`.trim(),
+          cor: v.cor,
+        });
+        ok++;
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      return interaction.editReply({ content: `✅ Sync concluído — **${ok}** veículo(s) enviados ao 911-bot.` });
     }
   },
 };
