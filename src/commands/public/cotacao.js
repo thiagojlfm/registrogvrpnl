@@ -44,20 +44,18 @@ module.exports = {
     const moneyEmoji = '<:MoneyGVRPNL:1235408784155869205>';
     const gvnlEmoji  = '<:GVNL:1391202082920595556>';
     const valorDisplay = valorFormatado.replace('$', '');
+    const hora = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
     const msgPayload = {
       flags: MessageFlags.IsComponentsV2,
       components: [{
         type: 17,
-        accent_color: cores.amarelo,
+        accent_color: 0x2B2D31,
         components: [
-          {
-            type: 10,
-            content:
-              `${gvnlEmoji} **Roadmap Resale Motors**\n` +
-              `> ${moneyEmoji} ${valorDisplay}\n` +
-              (obs ? `> ${obs}\n` : '') +
-              `-# Cotado por <@${interaction.user.id}>`,
-          },
+          { type: 10, content: `${gvnlEmoji} **ROADMAP RESALE MOTORS** · Cotação de Veículo` },
+          { type: 14, divider: true, spacing: 1 },
+          { type: 10, content: `${moneyEmoji} **${valorDisplay}** — valor cotado${obs ? `\n> ${obs}` : ''}` },
+          { type: 14, divider: true, spacing: 1 },
+          { type: 10, content: `-# Cotado por <@${interaction.user.id}> — ${hora}` },
         ],
       }],
     };
