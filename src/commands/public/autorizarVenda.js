@@ -46,9 +46,26 @@ module.exports = {
       return interaction.editReply({ content: '❌ Não foi possível ler o histórico do tópico.' });
     }
 
-    const mensagensAntigas = todasMensagens; // alias para compatibilidade abaixo
-
     const agora = Date.now();
+
+    // Trava: só uma VENDA AUTORIZADA por tópico
+    const msgVendaAutorizada = todasMensagens.find(m => {
+      if (m.author.id !== interaction.client.user.id) return false;
+      return JSON.stringify(m.components || []).includes('VENDA AUTORIZADA');
+    });
+
+    if (msgVendaAutorizada) {
+      const rawTexto = JSON.stringify(msgVendaAutorizada.components || []);
+      const compradorExistente = rawTexto.match(/"<@(\d+)>"/)?.[1];
+      if (compradorExistente !== comprador.id) {
+        return interaction.editReply({
+          content:
+            `❌ Este tópico já tem uma **VENDA AUTORIZADA** para <@${compradorExistente}>.\n` +
+            `Só pode existir uma autorização por tópico.`,
+        });
+      }
+      // Mesmo comprador → re-autorização permitida (recuperação após redeploy)
+    }
 
     // Foca no !pay: busca o !pay mais recente nas mensagens do tópico (últimas 2h)
     const msgPayCmd = [...todasMensagens].reverse().find(m => {
