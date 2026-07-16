@@ -15,15 +15,15 @@ function msgImportacaoRegistrada({ compradorId, veiculo, modelo, vin }) {
   return {
     flags: v2(),
     components: [
-      container(cores.verde, [
+      container(cores.azul, [
         text(
-          `## ${sim} IMPORTAÇÃO REGISTRADA\n` +
-          `> **Comprador:** <@${compradorId}>\n` +
-          `> **Veículo:** ${veiculo} ${modelo}\n` +
-          `> **VIN:** \`${vin}\``
+          `## ${rpc} VIN GERADO — \`${vin}\`\n` +
+          `-# ${veiculo}${modelo ? ` ${modelo}` : ''}`
         ),
         sep(),
-        text(`Use **/registrar_veiculo** com sua placa, cor e foto para finalizar o registro oficial do veículo.`),
+        text(
+          `<@${compradorId}>, use **/registrar_veiculo** com sua **placa**, **cor** e **foto** para finalizar o registro oficial.`
+        ),
       ]),
     ],
   };
