@@ -37,12 +37,12 @@ async function sincronizarImportacoes(client) {
       if (!raw.includes('IMPORTA')) continue; // filtra rápido
 
       const dados = parsearMensagemImportacao(msg);
-      if (!dados.comprador_id) continue;
+      console.log(`[sync/import] msg ${msg.id} → comprador_id=${dados.comprador_id} comprovante=${dados.comprovante} valor=${dados.valor_pago}`);
 
-      // Pula se já tem pendente ou já registrou
-      if (compradoresAtivos.has(dados.comprador_id)) continue;
-      if (compradoresRegist.has(dados.comprador_id)) continue;
-      if (!dados.comprovante?.trim()) continue;
+      if (!dados.comprador_id) { console.log(`[sync/import] skip: sem comprador_id`); continue; }
+      if (compradoresAtivos.has(dados.comprador_id)) { console.log(`[sync/import] skip: pendente ativo`); continue; }
+      if (compradoresRegist.has(dados.comprador_id)) { console.log(`[sync/import] skip: ja registrado`); continue; }
+      if (!dados.comprovante?.trim()) { console.log(`[sync/import] skip: sem comprovante`); continue; }
 
       // Valida comprovante
       const ids = parsearUrlDiscord(dados.comprovante);
