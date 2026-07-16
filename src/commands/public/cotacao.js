@@ -41,6 +41,7 @@ module.exports = {
 
     const { carro, infoAlt, seta, dot, rpc2, rpw } = e || {};
 
+    const moneyEmoji = '<:MoneyGVRPNL:1235408784155869205>';
     const msgPayload = {
       flags: MessageFlags.IsComponentsV2,
       components: [{
@@ -50,7 +51,8 @@ module.exports = {
           {
             type: 10,
             content:
-              `## 💰 ${valorFormatado}\n` +
+              `${moneyEmoji} **COTAÇÃO** ${moneyEmoji}\n` +
+              `# ${valorFormatado}\n` +
               (obs ? `> ${obs}\n` : '') +
               `-# Cotado por <@${interaction.user.id}>`,
           },
