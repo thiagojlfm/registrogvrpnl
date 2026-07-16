@@ -12,6 +12,11 @@ function normalizarValor(str) {
     return Math.round(parseFloat(s.replace(/,/g, '')) * 100);
   }
 
+  // Ponto como separador de milhar BR: "1.000", "45.000" (3 dígitos após ponto, sem vírgula)
+  if (s.includes('.') && !s.includes(',') && /\.\d{3}$/.test(s)) {
+    return Math.round(parseFloat(s.replace(/\./g, '')) * 100);
+  }
+
   // Formato BR: 45.563,00 → separador decimal é vírgula
   if (s.includes(',') && s.lastIndexOf(',') > s.lastIndexOf('.')) {
     const norm = s.replace(/\./g, '').replace(',', '.');

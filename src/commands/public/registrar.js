@@ -41,9 +41,6 @@ module.exports = {
         )
     )
     .addStringOption(o =>
-      o.setName('comprovante_recompra').setDescription('Link do comprovante de recompra (veículo usado)').setRequired(false)
-    )
-    .addStringOption(o =>
       o.setName('empresa_nome').setDescription('Nome da empresa (se empresarial)').setRequired(false)
     )
     .addStringOption(o =>
@@ -68,7 +65,6 @@ module.exports = {
     const foto = interaction.options.getAttachment('foto');
     const tipo = interaction.options.getString('tipo');
     const classe = interaction.options.getString('classe');
-    const comprovanteRecompra = interaction.options.getString('comprovante_recompra');
     const empresaNome = interaction.options.getString('empresa_nome');
     const empresaLink = interaction.options.getString('empresa_link');
     const finalidade = interaction.options.getString('finalidade');
@@ -92,7 +88,7 @@ module.exports = {
       obs: pendente.obs,
       link_cotacao: pendente.link_cotacao || null,
       comprovante: pendente.comprovante,
-      comprovante_recompra: comprovanteRecompra || null,
+      comprovante_recompra: null,
       valor_pago: pendente.valor_pago,
       foto_url: foto.url,
       link_registro: null,
