@@ -3,6 +3,7 @@ const { canalRegistroVeicularId } = require('../../config/config');
 const { getPendente, removerPendente, adicionarVeiculo, atualizarVeiculo } = require('../../services/database/db');
 const { msgRegistroOficial } = require('../../utils/formatter');
 const { notificar911 } = require('../../services/notificar911');
+const { logRegistro } = require('../../services/auditoria');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -111,6 +112,12 @@ module.exports = {
 
     const linkRegistro = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgPublicada.id}`;
     atualizarVeiculo(pendente.vin, { link_registro: linkRegistro });
+
+    await logRegistro(interaction.client, {
+      veiculo,
+      registradorId: interaction.user.id,
+      linkRegistro,
+    });
 
     await notificar911(interaction.client, {
       tipo: 'registro',

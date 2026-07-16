@@ -8,6 +8,7 @@ module.exports = {
   idBotEconomia: process.env.ID_BOT_ECONOMIA,
   canalImportacaoId: process.env.CANAL_IMPORTACAO_ID,
   canalRegistroVeicularId: process.env.CANAL_REGISTRO_VEICULAR_ID,
+  canalAuditoriaId: process.env.CANAL_AUDITORIA_ID,
   cargoAtendente: process.env.CARGO_ATENDENTE_ID,
   idBot911: process.env.ID_BOT_911,
   dbPath: process.env.DB_PATH || './data',

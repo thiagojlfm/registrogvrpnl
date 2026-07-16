@@ -7,6 +7,7 @@ const { msgTransferencia, msgRegistroOficial } = require('../utils/formatter');
 const { parsearUrlDiscord } = require('../utils/valorParser');
 const { canalRegistroVeicularId } = require('../config/config');
 const { notificar911 } = require('../services/notificar911');
+const { logTransferencia } = require('../services/auditoria');
 
 const comandos = new Map();
 
@@ -173,6 +174,13 @@ module.exports = {
         novoProprietarioId: novoId,
         comprovante,
       }));
+
+      await logTransferencia(interaction.client, {
+        veiculo,
+        exProprietarioId,
+        novoProprietarioId: novoId,
+        comprovante,
+      });
 
       await notificar911(interaction.client, {
         tipo: 'transferencia',
