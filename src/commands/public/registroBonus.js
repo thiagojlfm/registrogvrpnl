@@ -145,9 +145,34 @@ module.exports = {
     });
 
     // DM de boas-vindas ao usuário
+    const nomeVeiculo = `${carroStr}${modelo ? ` ${modelo}` : ''}`;
     const dmTexto = tipo === 'staff'
-      ? `🛡️ **Parabéns, membro da equipe!**\n\nSeu veículo de Staff **${carroStr}${modelo ? ` ${modelo}` : ''}** foi registrado com sucesso no GVRPNL.\n\nPlaca: \`${placa}\` · VIN: \`${vin}\`\n\n> Você pode trocar seu veículo de Staff a cada **7 dias**.\n> [Ver registro](${linkRegistro})`
-      : `🚀 **Obrigado pelo seu apoio ao servidor!**\n\nSeu veículo Booster **${carroStr}${modelo ? ` ${modelo}` : ''}** foi registrado com sucesso no GVRPNL.\n\nPlaca: \`${placa}\` · VIN: \`${vin}\`\n\n> Você pode trocar seu veículo Boost a cada **7 dias**.\n> [Ver registro](${linkRegistro})`;
+      ? [
+          `🛡️ **Bem-vindo ao time, ${interaction.user.displayName}!**`,
+          ``,
+          `Seu veículo de Staff foi registrado com sucesso no **GVRPNL**.`,
+          ``,
+          `> 🚗 **${nomeVeiculo}**`,
+          `> 🔖 Placa: \`${placa}\``,
+          `> 🔑 VIN: \`${vin}\``,
+          ``,
+          `Como membro da equipe, você tem direito a **1 veículo de Staff** que pode ser trocado a cada **7 dias**.`,
+          ``,
+          `[Ver registro oficial](${linkRegistro})`,
+        ].join('\n')
+      : [
+          `🚀 **Obrigado por impulsionar o GVRPNL, ${interaction.user.displayName}!**`,
+          ``,
+          `Seu veículo Booster foi registrado com sucesso. Esse é nosso agradecimento pelo seu apoio ao servidor. 💜`,
+          ``,
+          `> 🚗 **${nomeVeiculo}**`,
+          `> 🔖 Placa: \`${placa}\``,
+          `> 🔑 VIN: \`${vin}\``,
+          ``,
+          `Você pode trocar seu veículo Boost a cada **7 dias**.`,
+          ``,
+          `[Ver registro oficial](${linkRegistro})`,
+        ].join('\n');
 
     try {
       const dm = await interaction.user.createDM();
