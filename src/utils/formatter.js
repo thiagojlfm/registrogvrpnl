@@ -1,7 +1,7 @@
 const { MessageFlags } = require('discord.js');
 const { cores, emojis: e } = require('../config/config');
 
-const { carro, info, infoAlt, sim, empresa: emp, vendido, seta, dot, rpc2, rpw, rpc } = e ? e : {};
+const { carro, info, infoAlt, sim, empresa: emp, vendido, seta, dot, rpc2, rpw, rpc, check } = e ? e : {};
 
 function text(content) { return { type: 10, content }; }
 function sep() { return { type: 14, divider: true, spacing: 1 }; }
@@ -52,11 +52,21 @@ function msgRegistroOficial(v) {
   }
 
   // Seção pessoal
-  const exProp = v._ex_proprietario_id ? `<@${v._ex_proprietario_id}>` : 'N/A';
+  const historico = v.historico_proprietarios || [];
+  // historico acumula cada novo dono; dono original não está no array
+  // totalDonos = 1 (original) + histórico de transferências
+  const totalDonos = 1 + historico.length;
+  const exPropId = v._ex_proprietario_id
+    || (historico.length >= 2 ? historico[historico.length - 2].id : null);
+  const exProp = exPropId ? `<@${exPropId}>` : 'N/A';
+  const donosLabel = totalDonos === 1
+    ? '1º dono — veículo nunca transferido'
+    : `${totalDonos}º dono — veículo passou por ${totalDonos} proprietário(s)`;
   components.push(text(
     `## ${carro} ${seta} Veículo ${v.tipo === 'empresarial' ? 'Empresarial' : 'Pessoal'}\n` +
-    `> ${dot} **Proprietário:** <@${v.comprador_id}>\n` +
-    `> ${dot} **Ex-proprietário:** ${exProp}`
+    `> ${dot} **Proprietário atual:** <@${v.comprador_id}>\n` +
+    `> ${dot} **Ex-proprietário:** ${exProp}\n` +
+    `-# ${vendido} ${donosLabel}`
   ));
   components.push(sep());
 
@@ -131,6 +141,42 @@ function msgTransferencia({ v, exProprietarioId, novoProprietarioId, comprovante
   };
 }
 
+// ── Confirmação de transferência (reply para o usuário) ───────────────────────
+
+function msgConfirmacaoTransferencia({ veiculo: v, exProprietarioId, novoProprietarioId, comprovante }) {
+  const data = new Date().toLocaleString('pt-BR');
+  const historico = v.historico_proprietarios || [];
+  const totalDonos = historico.length + 1;
+  const donosLabel = totalDonos === 1 ? '1º dono' : `${totalDonos}º proprietário desde a origem`;
+
+  return {
+    flags: v2(),
+    components: [
+      container(cores.amarelo, [
+        text(
+          `## ${vendido} TRANSFERÊNCIA CONCLUÍDA\n` +
+          `-# Propriedade registrada com sucesso`
+        ),
+        sep(),
+        text(
+          `## ${carro} ${seta} ${v.veiculo}${v.modelo ? ` ${v.modelo}` : ''}\n` +
+          `> ${rpw} **Placa:** \`${v.placa}\`\n` +
+          `> ${rpc} **VIN:** \`${v.vin}\``
+        ),
+        sep(),
+        text(
+          `## ${infoAlt} ${seta} Mudança de proprietário\n` +
+          `> ${dot} **Vendedor:** <@${exProprietarioId}>\n` +
+          `> ${dot} **Comprador:** <@${novoProprietarioId}>\n` +
+          `> ${dot} **Comprovante:** ${comprovante}`
+        ),
+        sep(),
+        text(`-# ${vendido} ${donosLabel} · ${data}`),
+      ]),
+    ],
+  };
+}
+
 // ── Consulta ──────────────────────────────────────────────────────────────────
 
 function msgConsulta(veiculos, pessoa) {
@@ -164,5 +210,6 @@ module.exports = {
   msgImportacaoRegistrada,
   msgRegistroOficial,
   msgTransferencia,
+  msgConfirmacaoTransferencia,
   msgConsulta,
 };

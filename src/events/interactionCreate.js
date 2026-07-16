@@ -3,7 +3,7 @@ const path = require('path');
 const { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
 const { buscarVeiculoPorVin, atualizarVeiculo, buscarVeiculosPorProprietario } = require('../services/database/db');
 const { buildCard } = require('../commands/public/garagem');
-const { msgRegistroOficial } = require('../utils/formatter');
+const { msgRegistroOficial, msgConfirmacaoTransferencia } = require('../utils/formatter');
 const { parsearUrlDiscord } = require('../utils/valorParser');
 const { notificar911 } = require('../services/notificar911');
 const { logTransferencia } = require('../services/auditoria');
@@ -182,9 +182,12 @@ module.exports = {
         modelo: `${veiculo.veiculo} ${veiculo.modelo || ''}`.trim(),
       });
 
-      await interaction.editReply({
-        content: `✅ Veículo **${veiculo.placa}** transferido para <@${novoId}> com sucesso.`,
-      });
+      await interaction.editReply(msgConfirmacaoTransferencia({
+        veiculo: { ...veiculo, comprador_id: novoId, historico_proprietarios: historico },
+        exProprietarioId,
+        novoProprietarioId: novoId,
+        comprovante,
+      }));
     }
   },
 };
