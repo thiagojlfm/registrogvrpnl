@@ -239,49 +239,99 @@ function agendarSyncMeiaNoite(client) {
   console.log(`[sync] Próxima reconciliação noturna às ${h}:${m} (em ${Math.round(msAte / 60000)} min)`);
 }
 
-// Recupera pendentes do canal de auditoria após redeploy
+// Recupera pendentes após redeploy — busca em dois lugares:
+// 1. Canal de auditoria (PENDENTE_JSON em mensagens novas)
+// 2. Threads ativas do servidor (VENDA AUTORIZADA do bot nas últimas 24h)
 async function recuperarPendentes(client) {
-  if (!canalAuditoriaId) return 0;
-  try {
-    const canal = await client.channels.fetch(canalAuditoriaId);
-    const msgs = await canal.messages.fetch({ limit: 100 });
-    const pendentesAtuais = lerPendentes();
-    const veiculos = lerVeiculos();
-    const vinsRegistrados = new Set(veiculos.map(v => v.vin));
-    let recuperados = 0;
+  const pendentesAtuais = lerPendentes();
+  const veiculos = lerVeiculos();
+  const vinsRegistrados = new Set(veiculos.map(v => v.vin));
+  const LIMITE_MS = 24 * 60 * 60 * 1000;
+  const agora = Date.now();
+  let recuperados = 0;
 
-    for (const msg of msgs.values()) {
-      if (msg.author.id !== client.user.id) continue;
-      const texto = extrairTexto(msg.components);
-      if (!texto.includes('PENDENTE_JSON:')) continue;
+  // ── 1. Auditoria (PENDENTE_JSON) ──────────────────────────────────────────
+  if (canalAuditoriaId) {
+    try {
+      const canal = await client.channels.fetch(canalAuditoriaId);
+      const msgs = await canal.messages.fetch({ limit: 100 });
 
-      const match = texto.match(/PENDENTE_JSON:(\{.+\})/);
-      if (!match) continue;
-
-      try {
-        const dados = JSON.parse(match[1]);
-        const { comprador_id, vin, criado_em, ...resto } = dados;
-
-        // Pula se já registrado ou se já tem pendente ativo
-        if (vinsRegistrados.has(vin)) continue;
-        if (pendentesAtuais[comprador_id]?.vin === vin) continue;
-        // Pula pendentes com mais de 24h
-        if (criado_em && (Date.now() - criado_em) > 24 * 60 * 60 * 1000) continue;
-
-        pendentesAtuais[comprador_id] = { vin, criado_em, ...resto };
-        recuperados++;
-      } catch {}
+      for (const msg of msgs.values()) {
+        if (msg.author.id !== client.user.id) continue;
+        const texto = extrairTexto(msg.components);
+        const match = texto.match(/PENDENTE_JSON:(\{.+\})/);
+        if (!match) continue;
+        try {
+          const dados = JSON.parse(match[1]);
+          const { comprador_id, vin, criado_em, ...resto } = dados;
+          if (vinsRegistrados.has(vin)) continue;
+          if (pendentesAtuais[comprador_id]?.vin === vin) continue;
+          if (criado_em && (agora - criado_em) > LIMITE_MS) continue;
+          pendentesAtuais[comprador_id] = { vin, criado_em, ...resto };
+          recuperados++;
+        } catch {}
+      }
+    } catch (err) {
+      console.error('[sync] Erro ao ler auditoria:', err.message);
     }
-
-    if (recuperados > 0) {
-      salvarPendentes(pendentesAtuais);
-      console.log(`[sync] ${recuperados} pendente(s) recuperado(s) da auditoria.`);
-    }
-    return recuperados;
-  } catch (err) {
-    console.error('[sync] Erro ao recuperar pendentes:', err.message);
-    return 0;
   }
+
+  // ── 2. Threads ativas do servidor (VENDA AUTORIZADA) ──────────────────────
+  try {
+    const guild = client.guilds.cache.first();
+    if (guild) {
+      const { threads } = await guild.channels.fetchActiveThreads();
+      for (const thread of threads.values()) {
+        try {
+          const msgs = await thread.messages.fetch({ limit: 50 });
+          for (const msg of msgs.values()) {
+            if (msg.author.id !== client.user.id) continue;
+            if ((agora - msg.createdTimestamp) > LIMITE_MS) continue;
+            const texto = extrairTexto(msg.components);
+            if (!texto.includes('VENDA AUTORIZADA')) continue;
+
+            // Extrai comprador_id e VIN do texto
+            const compradorMatch = texto.match(/Comprador[:\s]+<@(\d+)>/);
+            const vinMatch = texto.match(/VIN[:\s`]+([0-9]{9})/);
+            if (!compradorMatch || !vinMatch) continue;
+
+            const comprador_id = compradorMatch[1];
+            const vin = vinMatch[1];
+
+            if (vinsRegistrados.has(vin)) continue;
+            if (pendentesAtuais[comprador_id]?.vin === vin) continue;
+
+            // Extrai dados básicos do texto para recriar o pendente mínimo
+            const veiculoMatch = texto.match(/Veículo[:\s]+(.+?)(?:\n|$)/);
+            const veiculoTexto = veiculoMatch ? veiculoMatch[1].replace(/\*\*/g, '').trim() : 'Não identificado';
+
+            pendentesAtuais[comprador_id] = {
+              vin,
+              importador_id: null,
+              veiculo: veiculoTexto,
+              modelo: '',
+              obs: '',
+              link_cotacao: null,
+              classe: null,
+              comprovante: msg.url,
+              valor_pago: 'N/A',
+              criado_em: msg.createdTimestamp,
+            };
+            recuperados++;
+            console.log(`[sync] Pendente recuperado via thread para <@${comprador_id}> VIN ${vin}`);
+          }
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.error('[sync] Erro ao escanear threads:', err.message);
+  }
+
+  if (recuperados > 0) {
+    salvarPendentes(pendentesAtuais);
+    console.log(`[sync] ${recuperados} pendente(s) recuperado(s) no total.`);
+  }
+  return recuperados;
 }
 
 module.exports = { sincronizarCanal, agendarSyncMeiaNoite, recuperarPendentes };
