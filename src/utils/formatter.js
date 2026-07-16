@@ -1,165 +1,148 @@
 const { MessageFlags } = require('discord.js');
-const { cores, emojis } = require('../config/config');
+const { cores, emojis: e } = require('../config/config');
 
-// Components V2 helpers
-function textDisplay(content) {
-  return { type: 10, content };
-}
+const { carro, info, infoAlt, sim, empresa: emp, vendido, seta, dot, rpc2, rpw, rpc } = e ? e : {};
 
-function separator() {
-  return { type: 14, divider: true, spacing: 1 };
-}
+function text(content) { return { type: 10, content }; }
+function sep() { return { type: 14, divider: true, spacing: 1 }; }
+function mediaGallery(items) { return { type: 12, items: items.map(url => ({ media: { url } })) }; }
+function container(accentColor, components) { return { type: 17, accent_color: accentColor, components }; }
+function v2() { return MessageFlags.IsComponentsV2; }
 
-function thumbnail(url) {
-  return { type: 11, media: { url } };
-}
-
-function section(components, accessory) {
-  const s = { type: 9, components };
-  if (accessory) s.accessory = accessory;
-  return s;
-}
-
-function mediaGallery(items) {
-  return { type: 12, items: items.map(url => ({ media: { url } })) };
-}
-
-function container(accentColor, components) {
-  return { type: 17, accent_color: accentColor, components };
-}
-
-function buildFlags() {
-  return MessageFlags.IsComponentsV2;
-}
-
-// ─── Mensagens públicas ───────────────────────────────────────────────────────
+// ── Importação registrada ─────────────────────────────────────────────────────
 
 function msgImportacaoRegistrada({ compradorId, veiculo, modelo, vin }) {
   return {
-    flags: buildFlags(),
+    flags: v2(),
     components: [
       container(cores.verde, [
-        textDisplay(
-          `## ${emojis.sim} IMPORTAÇÃO REGISTRADA\n` +
+        text(
+          `## ${sim} IMPORTAÇÃO REGISTRADA\n` +
           `> **Comprador:** <@${compradorId}>\n` +
           `> **Veículo:** ${veiculo} ${modelo}\n` +
           `> **VIN:** \`${vin}\``
         ),
-        separator(),
-        textDisplay(
-          'Use **/registrar_veiculo** com sua placa, cor e foto para\nfinalizar o registro oficial do veículo.'
-        ),
+        sep(),
+        text(`Use **/registrar_veiculo** com sua placa, cor e foto para finalizar o registro oficial do veículo.`),
       ]),
     ],
   };
 }
 
+// ── Registro oficial ──────────────────────────────────────────────────────────
+
 function msgRegistroOficial(v) {
   const data = new Date(v.data_registro).toLocaleDateString('pt-BR');
+  const modelo = v.modelo || '';
+  const components = [];
 
-  const linhasProprietario = [
-    `## ${emojis.carro} → Veículo ${v.tipo === 'empresarial' ? 'Empresarial' : 'Pessoal'}`,
-    `> Proprietário: <@${v.comprador_id}>`,
-    `> Ex-proprietário: N/A`,
-  ];
+  // Cabeçalho
+  components.push(text(`## ${carro} VEÍCULO REGISTRADO`));
+  components.push(sep());
 
-  const linhasEmpresa = v.tipo === 'empresarial' ? [
-    `## ${emojis.empresa} → Veículo Empresarial`,
-    `> Nome da empresa: ${v.empresa}`,
-    `> Link do registro: ${v.empresa_link}`,
-  ] : [];
-
-  const linhasInfo = [
-    `## ${emojis.info} → Informações do veículo`,
-    `> Ano, marca, modelo: ${v.veiculo}`,
-    `> Versão: ${v.modelo}`,
-    `> Coloração: ${v.cor}`,
-    `> Placa: ${v.placa}`,
-    `> VIN Number: ${v.vin}`,
-  ];
-
-  const linhasPagamento = [
-    `## ${emojis.infoAlt} → Pagamentos`,
-    `> Comprovante de Pagamento: ${v.comprovante}`,
-    `> Valor pago: ${v.valor_pago}`,
-  ];
-
-  const components = [
-    textDisplay(`## ${emojis.carro} VEÍCULO REGISTRADO`),
-    separator(),
-    textDisplay(linhasProprietario.join('\n')),
-  ];
-
-  if (linhasEmpresa.length) {
-    components.push(separator(), textDisplay(linhasEmpresa.join('\n')));
+  // Seção empresarial
+  if (v.tipo === 'empresarial') {
+    components.push(text(
+      `## ${emp} ${seta} Veículo Empresarial\n` +
+      `> ${dot} **Nome da empresa:** ${v.empresa || 'N/A'}\n` +
+      `> ${dot} **Link do registro da empresa:** ${v.empresa_link || 'N/A'}\n` +
+      `> ${dot} **Finalidade:** ${v.finalidade || 'N/A'}`
+    ));
+    components.push(sep());
   }
 
-  components.push(
-    separator(),
-    textDisplay(linhasInfo.join('\n')),
-    separator(),
-    textDisplay(linhasPagamento.join('\n')),
-  );
+  // Seção pessoal
+  components.push(text(
+    `## ${carro} ${seta} Veículo ${v.tipo === 'empresarial' ? 'Empresarial' : 'Pessoal'}\n` +
+    `> ${dot} **Proprietário:** <@${v.comprador_id}>\n` +
+    `> ${dot} **Ex-proprietário:** N/A`
+  ));
+  components.push(sep());
 
+  // Informações do veículo
+  components.push(text(
+    `## ${info} ${seta} **Informações do veículo**\n` +
+    `> ${rpc2} **Ano, marca, modelo:** ${v.veiculo}\n` +
+    `> ${rpw} **Versão:** ${modelo || 'N/A'}\n` +
+    `> ${rpw} **Coloração:** ${v.cor}\n` +
+    `> ${rpw} **Classe:** ${v.classe || 'N/A'}\n` +
+    `> ${rpw} **Placa:** ${v.placa}\n` +
+    `> ${rpc} **VIN Number:** ${v.vin}`
+  ));
+  components.push(sep());
+
+  // Pagamentos
+  components.push(text(
+    `## ${infoAlt} ${seta} Pagamentos\n` +
+    `> ${dot} **Comprovante de Cotação/Orçamento:** ${v.link_cotacao || 'N/A'}\n` +
+    `> ${dot} **Comprovante de Pagamento:** ${v.comprovante || 'N/A'}\n` +
+    `> ${dot} **Comprovante de Recompra (Usado):** ${v.comprovante_recompra || 'N/A'}\n` +
+    `> ${dot} **Foto do veículo com placa visível:** ${v.foto_url ? `[Ver foto](${v.foto_url})` : 'N/A'}`
+  ));
+
+  // Foto
   if (v.foto_url) {
-    components.push(separator(), mediaGallery([v.foto_url]));
+    components.push(sep());
+    components.push(mediaGallery([v.foto_url]));
   }
 
-  components.push(
-    separator(),
-    textDisplay(`-# Registro gerado automaticamente · ${data}`)
-  );
+  components.push(sep());
+  components.push(text(`-# Registro gerado automaticamente · ${data}`));
 
   return {
-    flags: buildFlags(),
+    flags: v2(),
     components: [container(cores.azul, components)],
   };
 }
 
+// ── Transferência ─────────────────────────────────────────────────────────────
+
 function msgTransferencia({ v, exProprietarioId, novoProprietarioId, comprovante }) {
   const data = new Date().toLocaleDateString('pt-BR');
   return {
-    flags: buildFlags(),
+    flags: v2(),
     components: [
       container(cores.amarelo, [
-        textDisplay(
-          `## ${emojis.vendido} TRANSFERÊNCIA DE VEÍCULO\n` +
-          `> Veículo: ${v.veiculo} ${v.modelo}\n` +
-          `> Placa: ${v.placa}\n` +
-          `> VIN: ${v.vin}\n` +
-          `> De: <@${exProprietarioId}>\n` +
-          `> Para: <@${novoProprietarioId}>\n` +
-          `> Comprovante: ${comprovante}`
+        text(
+          `## ${vendido} TRANSFERÊNCIA DE VEÍCULO\n` +
+          `> ${dot} **Veículo:** ${v.veiculo} ${v.modelo || ''}\n` +
+          `> ${dot} **Placa:** ${v.placa}\n` +
+          `> ${rpc} **VIN:** ${v.vin}\n` +
+          `> ${dot} **De:** <@${exProprietarioId}>\n` +
+          `> ${dot} **Para:** <@${novoProprietarioId}>\n` +
+          `> ${dot} **Comprovante:** ${comprovante}`
         ),
-        separator(),
-        textDisplay(`-# Transferência registrada em ${data}`),
+        sep(),
+        text(`-# Transferência registrada em ${data}`),
       ]),
     ],
   };
 }
+
+// ── Consulta ──────────────────────────────────────────────────────────────────
 
 function msgConsulta(veiculos, pessoa) {
   const linhas = veiculos.map(v => {
     const data = new Date(v.data_registro).toLocaleDateString('pt-BR');
     return (
-      `> 🚗 ${v.veiculo} ${v.modelo} | Placa: \`${v.placa}\` | VIN: \`${v.vin}\`\n` +
-      `> Cor: ${v.cor} | Registrado em: ${data}`
+      `> ${carro} **${v.veiculo} ${v.modelo || ''}** | Placa: \`${v.placa}\` | VIN: \`${v.vin}\`\n` +
+      `> ${rpw} Cor: ${v.cor} | Classe: ${v.classe || 'N/A'} | Registrado em: ${data}`
     );
   });
 
   return {
-    flags: buildFlags(),
+    flags: v2(),
     ephemeral: true,
     components: [
       container(cores.azul, [
-        textDisplay(
+        text(
           `## 🔍 CONSULTA VEICULAR\n` +
-          (pessoa ? `> Proprietário: <@${pessoa}>\n` : '')
+          (pessoa ? `> **Proprietário:** <@${pessoa}>\n` : '')
         ),
-        separator(),
-        textDisplay(linhas.join('\n') + '\n'),
-        separator(),
-        textDisplay(`-# ${veiculos.length} veículo(s) encontrado(s)`),
+        sep(),
+        text(linhas.join('\n')),
+        sep(),
+        text(`-# ${veiculos.length} veículo(s) encontrado(s)`),
       ]),
     ],
   };

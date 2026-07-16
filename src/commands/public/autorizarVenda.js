@@ -123,6 +123,7 @@ module.exports = {
       veiculo: veiculoNome,
       modelo: modeloNome,
       obs: '',
+      link_cotacao: msgCotacao?.url || null,
       comprovante: msgPagamento.url,
       valor_pago: valorPago || 'N/A',
       foto_sugerida: fotoUrl,

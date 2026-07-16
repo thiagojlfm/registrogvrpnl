@@ -27,10 +27,29 @@ module.exports = {
         )
     )
     .addStringOption(o =>
+      o.setName('classe')
+        .setDescription('Classe do veículo')
+        .setRequired(false)
+        .addChoices(
+          { name: 'Sports', value: 'Sports' },
+          { name: 'Luxury', value: 'Luxury' },
+          { name: 'Classic', value: 'Classic' },
+          { name: 'Electric', value: 'Electric' },
+          { name: 'Pickup / SUV', value: 'Pickup / SUV' },
+          { name: 'Moto', value: 'Moto' },
+        )
+    )
+    .addStringOption(o =>
+      o.setName('comprovante_recompra').setDescription('Link do comprovante de recompra (veículo usado)').setRequired(false)
+    )
+    .addStringOption(o =>
       o.setName('empresa_nome').setDescription('Nome da empresa (se empresarial)').setRequired(false)
     )
     .addStringOption(o =>
       o.setName('empresa_link').setDescription('Link do registro da empresa (se empresarial)').setRequired(false)
+    )
+    .addStringOption(o =>
+      o.setName('finalidade').setDescription('Finalidade da empresa (se empresarial)').setRequired(false)
     ),
 
   async execute(interaction) {
@@ -47,8 +66,11 @@ module.exports = {
     const cor = interaction.options.getString('cor');
     const foto = interaction.options.getAttachment('foto');
     const tipo = interaction.options.getString('tipo');
+    const classe = interaction.options.getString('classe');
+    const comprovanteRecompra = interaction.options.getString('comprovante_recompra');
     const empresaNome = interaction.options.getString('empresa_nome');
     const empresaLink = interaction.options.getString('empresa_link');
+    const finalidade = interaction.options.getString('finalidade');
 
     if (tipo === 'empresarial' && (!empresaNome || !empresaLink)) {
       return interaction.editReply({ content: '❌ Para registro empresarial, informe **empresa_nome** e **empresa_link**.' });
@@ -64,15 +86,18 @@ module.exports = {
       modelo: pendente.modelo,
       cor,
       placa,
-      classe: null,
+      classe: classe || null,
       obs: pendente.obs,
+      link_cotacao: pendente.link_cotacao || null,
       comprovante: pendente.comprovante,
+      comprovante_recompra: comprovanteRecompra || null,
       valor_pago: pendente.valor_pago,
       foto_url: foto.url,
       link_registro: null,
       tipo,
       empresa: empresaNome || null,
       empresa_link: empresaLink || null,
+      finalidade: finalidade || null,
       historico_proprietarios: [{ id: interaction.user.id, desde: agora }],
       data_registro: agora,
       ativo: true,
