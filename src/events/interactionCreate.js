@@ -3,9 +3,8 @@ const path = require('path');
 const { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
 const { buscarVeiculoPorVin, atualizarVeiculo, buscarVeiculosPorProprietario } = require('../services/database/db');
 const { buildCard } = require('../commands/public/garagem');
-const { msgTransferencia, msgRegistroOficial } = require('../utils/formatter');
+const { msgRegistroOficial } = require('../utils/formatter');
 const { parsearUrlDiscord } = require('../utils/valorParser');
-const { canalRegistroVeicularId } = require('../config/config');
 const { notificar911 } = require('../services/notificar911');
 const { logTransferencia } = require('../services/auditoria');
 
@@ -167,14 +166,7 @@ module.exports = {
         }
       }
 
-      const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
-      await canal.send(msgTransferencia({
-        v: veiculo,
-        exProprietarioId,
-        novoProprietarioId: novoId,
-        comprovante,
-      }));
-
+      // Só loga na auditoria — não posta no canal de registro
       await logTransferencia(interaction.client, {
         veiculo,
         exProprietarioId,
