@@ -59,10 +59,23 @@ async function sincronizarImportacoes(client) {
         const canalComp = await client.channels.fetch(ids.channelId);
         const msgComp   = await canalComp.messages.fetch(ids.messageId);
         if (msgComp.author.id === idBotEconomia) {
-          // Comprovante aponta para confirmação do bot de economia → valida valor
-          const embed      = msgComp.embeds?.[0];
-          const valorEmbed = embed ? extrairValorEmbed(embed) : null;
-          valorOk = !dados.valor_pago || valoresConferem(valorEmbed, dados.valor_pago);
+          // Comprovante do bot de economia → valida valor (embed ou V2)
+          let valorComp = null;
+          const embed = msgComp.embeds?.[0];
+          if (embed) valorComp = extrairValorEmbed(embed);
+          if (!valorComp) {
+            try {
+              const raw = msgComp.toJSON?.() ?? {};
+              const textoV2 = JSON.stringify(raw.components || raw.embeds || '');
+              const match = textoV2.match(/\$\s*[\d,. ]+/);
+              if (match) valorComp = match[0].replace(/\s/g, '');
+            } catch {}
+          }
+          if (!valorComp && msgComp.content) {
+            const match = msgComp.content.match(/\$\s*[\d,. ]+/);
+            if (match) valorComp = match[0].replace(/\s/g, '');
+          }
+          valorOk = !dados.valor_pago || valoresConferem(valorComp, dados.valor_pago);
         } else {
           // Comprovante aponta para mensagem do atendente/bot interno → importação já foi
           // validada manualmente, aceita sem comparação de valor

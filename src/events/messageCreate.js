@@ -41,18 +41,36 @@ module.exports = {
       return;
     }
 
-    // 3. Se for do UnbelievaBoat, valida o valor; caso contrário (msg do atendente/bot
+    // 3. Se for do bot de economia, valida o valor; caso contrário (msg do atendente/bot
     //    interno), a importação já foi aprovada manualmente — aceita sem comparação
     if (msgComprovante.author.id === idBotEconomia) {
+      let valorComp = null;
+
+      // Tenta embed clássico primeiro
       const embed = msgComprovante.embeds?.[0];
-      if (!embed) {
-        await message.channel.send('⚠️ Importação ignorada: embed de pagamento não encontrado no comprovante.');
-        return;
+      if (embed) {
+        valorComp = extrairValorEmbed(embed);
       }
-      const valorEmbed = extrairValorEmbed(embed);
-      if (!valorEmbed || !valoresConferem(valorEmbed, dados.valor_pago)) {
+
+      // Fallback: mensagem V2 (Components V2 sem embeds) — extrai texto dos componentes
+      if (!valorComp) {
+        try {
+          const raw = msgComprovante.toJSON?.() ?? {};
+          const textoV2 = JSON.stringify(raw.components || raw.embeds || '');
+          const match = textoV2.match(/\$\s*[\d,. ]+/);
+          if (match) valorComp = match[0].replace(/\s/g, '');
+        } catch {}
+      }
+
+      // Fallback: content puro
+      if (!valorComp && msgComprovante.content) {
+        const match = msgComprovante.content.match(/\$\s*[\d,. ]+/);
+        if (match) valorComp = match[0].replace(/\s/g, '');
+      }
+
+      if (!valorComp || !valoresConferem(valorComp, dados.valor_pago)) {
         await message.channel.send(
-          `⚠️ Importação ignorada: valor no comprovante (**${valorEmbed || 'não encontrado'}**) não confere com o valor informado (**${dados.valor_pago}**).`
+          `⚠️ Importação ignorada: valor no comprovante (**${valorComp || 'não encontrado'}**) não confere com o valor informado (**${dados.valor_pago}**).`
         );
         return;
       }
