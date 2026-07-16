@@ -141,14 +141,27 @@ async function logPendente(client, { comprador_id, pendente }) {
   await postar(client, {
     flags: v2(),
     components: [container(cores.azul, [
+      text(`## 🕐 PENDENTE DE REGISTRO`),
+      sep(),
       text(
-        `## 🕐 PENDENTE DE REGISTRO\n` +
+        `## ${carro} ${seta} Veículo\n` +
+        `> ${rpc2} **Ano, marca, modelo:** ${pendente.veiculo}\n` +
+        `> ${rpw} **Versão:** ${pendente.modelo || 'N/A'}\n` +
+        `> ${rpw} **Classe:** ${pendente.classe || 'N/A'}\n` +
+        `> ${rpc} **VIN:** \`${pendente.vin}\``
+      ),
+      sep(),
+      text(
+        `## ${infoAlt} ${seta} Compra\n` +
         `> ${dot} **Comprador:** <@${comprador_id}>\n` +
-        `> ${rpc2} **Veículo:** ${pendente.veiculo} ${pendente.modelo || ''}\n` +
-        `> ${rpw} **Placa:** pendente\n` +
-        `> ${rpc} **VIN:** \`${pendente.vin}\`\n` +
-        `-# PENDENTE_JSON:${JSON.stringify({ comprador_id, ...pendente })}\n` +
-        `-# ${ts()}`
+        `> ${dot} **Autorizado por:** <@${pendente.importador_id}>\n` +
+        `> ${dot} **Valor pago:** ${pendente.valor_pago || 'N/A'}\n` +
+        `> ${dot} **Comprovante:** ${pendente.comprovante || 'N/A'}`
+      ),
+      sep(),
+      text(
+        `-# 🔒 Aguardando /registrar_veiculo · ${ts()}\n` +
+        `-# PENDENTE_JSON:${JSON.stringify({ comprador_id, ...pendente })}`
       ),
     ])],
   });
