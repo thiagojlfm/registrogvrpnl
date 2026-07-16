@@ -88,6 +88,17 @@ function msgRegistroOficial(v) {
 
   components.push(sep());
   components.push(text(`-# Registro gerado automaticamente · ${data}`));
+  components.push({
+    type: 1,
+    components: [
+      {
+        type: 2,
+        style: 4,
+        label: '🔄 Transferir veículo',
+        custom_id: `btn_transferir:${v.vin}`,
+      },
+    ],
+  });
 
   return {
     flags: v2(),
@@ -98,18 +109,29 @@ function msgRegistroOficial(v) {
 // ── Transferência ─────────────────────────────────────────────────────────────
 
 function msgTransferencia({ v, exProprietarioId, novoProprietarioId, comprovante }) {
-  const data = new Date().toLocaleDateString('pt-BR');
+  const data = new Date().toLocaleString('pt-BR');
   return {
     flags: v2(),
     components: [
       container(cores.amarelo, [
+        text(`## ${vendido} TRANSFERÊNCIA DE VEÍCULO`),
+        sep(),
         text(
-          `## ${vendido} TRANSFERÊNCIA DE VEÍCULO\n` +
-          `> ${dot} **Veículo:** ${v.veiculo} ${v.modelo || ''}\n` +
-          `> ${dot} **Placa:** ${v.placa}\n` +
-          `> ${rpc} **VIN:** ${v.vin}\n` +
-          `> ${dot} **De:** <@${exProprietarioId}>\n` +
-          `> ${dot} **Para:** <@${novoProprietarioId}>\n` +
+          `## ${carro} ${seta} Veículo\n` +
+          `> ${rpc2} **Ano, marca, modelo:** ${v.veiculo}\n` +
+          `> ${rpw} **Versão:** ${v.modelo || 'N/A'}\n` +
+          `> ${rpw} **Placa:** ${v.placa}\n` +
+          `> ${rpc} **VIN Number:** ${v.vin}`
+        ),
+        sep(),
+        text(
+          `## ${infoAlt} ${seta} Proprietários\n` +
+          `> ${dot} **Vendedor:** <@${exProprietarioId}>\n` +
+          `> ${dot} **Comprador:** <@${novoProprietarioId}>`
+        ),
+        sep(),
+        text(
+          `## ${info} ${seta} Pagamento\n` +
           `> ${dot} **Comprovante:** ${comprovante}`
         ),
         sep(),

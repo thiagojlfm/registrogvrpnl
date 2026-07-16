@@ -63,23 +63,12 @@ module.exports = {
       });
     }
 
-    // Extrai valor — tenta embed (todos os campos), depois content, depois mensagem do !pay
+    // Extrai valor apenas da mensagem confirmada do UnbelievaBoat (embed + content)
     const embed = msgPagamento.embeds?.[0];
     let valorPago = embed ? extrairValorEmbed(embed) : null;
-
-    // Fallback: content da mensagem do UnbelievaBoat
     if (!valorPago && msgPagamento.content) {
       const m = msgPagamento.content.match(/\$\s*[\d.,]+/);
       if (m) valorPago = m[0].replace(/\s/g, '');
-    }
-
-    // Fallback: mensagem do !pay enviada por qualquer usuário no tópico
-    if (!valorPago) {
-      const msgPay = todasMensagens.find(m => /!pay\b/i.test(m.content));
-      if (msgPay) {
-        const m = msgPay.content.match(/\b\d[\d.,]*\b/g);
-        if (m) valorPago = `$${m[m.length - 1]}`; // último número = valor
-      }
     }
 
     // Extrai veículo da mensagem que originou o tópico (cotação), pulando linhas de menção
@@ -88,7 +77,8 @@ module.exports = {
       .map(l => l.trim())
       .filter(l => l && !l.match(/^<@!?\d+>$/) && !l.startsWith('@'));
     const veiculoTexto = linhasCotacao[0] || 'Não identificado';
-    const modeloExtra = linhasCotacao[1] || '';
+    const modeloExtra  = linhasCotacao[1] || '';
+    const classeCotacao = linhasCotacao[2] || null;
 
     // Extrai foto: tenta primeiro na cotação, depois nas mensagens do tópico
     let fotoUrl = null;
@@ -124,6 +114,7 @@ module.exports = {
       modelo: modeloNome,
       obs: '',
       link_cotacao: msgCotacao?.url || null,
+      classe: classeCotacao,
       comprovante: msgPagamento.url,
       valor_pago: valorPago || 'N/A',
       foto_sugerida: fotoUrl,

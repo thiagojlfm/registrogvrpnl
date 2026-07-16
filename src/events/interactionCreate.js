@@ -1,5 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const { ModalBuilder, ActionRowBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { buscarVeiculoPorVin, atualizarVeiculo } = require('../services/database/db');
+const { msgTransferencia } = require('../utils/formatter');
+const { canalRegistroVeicularId } = require('../config/config');
+const { notificar911 } = require('../services/notificar911');
 
 const comandos = new Map();
 
@@ -8,8 +13,7 @@ function carregarComandos() {
   for (const dir of dirs) {
     const pasta = path.join(__dirname, '../commands', dir);
     if (!fs.existsSync(pasta)) continue;
-    const arquivos = fs.readdirSync(pasta).filter(f => f.endsWith('.js'));
-    for (const arquivo of arquivos) {
+    for (const arquivo of fs.readdirSync(pasta).filter(f => f.endsWith('.js'))) {
       const cmd = require(path.join(pasta, arquivo));
       if (cmd.data) comandos.set(cmd.data.name, cmd);
     }
@@ -18,24 +22,117 @@ function carregarComandos() {
 
 carregarComandos();
 
+async function abrirModalTransferencia(interaction, vin) {
+  const modal = new ModalBuilder()
+    .setCustomId(`modal_transferir:${vin}`)
+    .setTitle('Transferir Veículo')
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('novo_proprietario_id')
+          .setLabel('Discord ID do novo proprietário')
+          .setPlaceholder('Cole o ID numérico (ex: 123456789012345678)')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+      ),
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('comprovante')
+          .setLabel('Link do comprovante de pagamento')
+          .setPlaceholder('https://discord.com/channels/...')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+      )
+    );
+  return interaction.showModal(modal);
+}
+
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction) {
-    if (!interaction.isChatInputCommand()) return;
-
-    const cmd = comandos.get(interaction.commandName);
-    if (!cmd) return;
-
-    try {
-      await cmd.execute(interaction);
-    } catch (err) {
-      console.error(`[interactionCreate] Erro em /${interaction.commandName}:`, err);
-      const resposta = { content: '❌ Ocorreu um erro ao executar este comando.', ephemeral: true };
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp(resposta);
-      } else {
-        await interaction.reply(resposta);
+    // ── Slash commands ───────────────────────────────────────────────────────
+    if (interaction.isChatInputCommand()) {
+      const cmd = comandos.get(interaction.commandName);
+      if (!cmd) return;
+      try {
+        await cmd.execute(interaction);
+      } catch (err) {
+        console.error(`[interactionCreate] Erro em /${interaction.commandName}:`, err);
+        const r = { content: '❌ Ocorreu um erro ao executar este comando.', ephemeral: true };
+        interaction.replied || interaction.deferred ? await interaction.followUp(r) : await interaction.reply(r);
       }
+      return;
+    }
+
+    // ── Select menu: garagem (escolha do carro pra transferir) ──────────────
+    if (interaction.isStringSelectMenu() && interaction.customId === 'sel_transferir_garagem') {
+      const vin = interaction.values[0];
+      return abrirModalTransferencia(interaction, vin);
+    }
+
+    // ── Botão: Transferir (direto do registro) ───────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith('btn_transferir:')) {
+      const vin = interaction.customId.split(':')[1];
+      const veiculo = buscarVeiculoPorVin(vin);
+
+      if (!veiculo || !veiculo.ativo) {
+        return interaction.reply({ content: '❌ Veículo não encontrado.', ephemeral: true });
+      }
+      if (veiculo.comprador_id !== interaction.user.id) {
+        return interaction.reply({ content: '❌ Apenas o proprietário registrado pode transferir este veículo.', ephemeral: true });
+      }
+
+      return abrirModalTransferencia(interaction, vin);
+    }
+
+    // ── Modal: confirmar transferência ───────────────────────────────────────
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_transferir:')) {
+      await interaction.deferReply({ ephemeral: true });
+
+      const vin = interaction.customId.split(':')[1];
+      const novoId = interaction.fields.getTextInputValue('novo_proprietario_id').trim();
+      const comprovante = interaction.fields.getTextInputValue('comprovante').trim();
+
+      if (!/^\d{17,20}$/.test(novoId)) {
+        return interaction.editReply({ content: '❌ ID inválido. Cole apenas os números do Discord ID do novo proprietário.' });
+      }
+
+      const veiculo = buscarVeiculoPorVin(vin);
+
+      if (!veiculo || !veiculo.ativo) {
+        return interaction.editReply({ content: '❌ Veículo não encontrado.' });
+      }
+      if (veiculo.comprador_id !== interaction.user.id) {
+        return interaction.editReply({ content: '❌ Você não é mais o proprietário registrado deste veículo.' });
+      }
+      if (novoId === interaction.user.id) {
+        return interaction.editReply({ content: '❌ Você não pode transferir o veículo para si mesmo.' });
+      }
+
+      const exProprietarioId = veiculo.comprador_id;
+      const historico = [...veiculo.historico_proprietarios, { id: novoId, desde: Date.now() }];
+
+      atualizarVeiculo(vin, { comprador_id: novoId, historico_proprietarios: historico });
+
+      const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
+      await canal.send(msgTransferencia({
+        v: veiculo,
+        exProprietarioId,
+        novoProprietarioId: novoId,
+        comprovante,
+      }));
+
+      await notificar911(interaction.client, {
+        tipo: 'transferencia',
+        discord_id: novoId,
+        placa: veiculo.placa,
+        vin: veiculo.vin,
+        modelo: `${veiculo.veiculo} ${veiculo.modelo || ''}`.trim(),
+      });
+
+      await interaction.editReply({
+        content: `✅ Veículo **${veiculo.placa}** transferido para <@${novoId}> com sucesso.`,
+      });
     }
   },
 };

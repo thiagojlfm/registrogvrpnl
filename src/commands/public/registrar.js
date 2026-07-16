@@ -86,7 +86,7 @@ module.exports = {
       modelo: pendente.modelo,
       cor,
       placa,
-      classe: classe || null,
+      classe: classe || pendente.classe || null,
       obs: pendente.obs,
       link_cotacao: pendente.link_cotacao || null,
       comprovante: pendente.comprovante,

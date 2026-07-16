@@ -1,76 +1,94 @@
-const { SlashCommandBuilder } = require('discord.js');
-const { canalRegistroVeicularId } = require('../../config/config');
-const { buscarVeiculoPorPlaca, atualizarVeiculo } = require('../../services/database/db');
-const { msgTransferencia } = require('../../utils/formatter');
-const { notificar911 } = require('../../services/notificar911');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { buscarVeiculosPorProprietario } = require('../../services/database/db');
+const { cores, emojis: em } = require('../../config/config');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('transferir_veiculo')
-    .setDescription('Transfere a propriedade de um veículo para outro usuário.')
-    .addStringOption(o =>
-      o.setName('placa').setDescription('Placa do veículo').setRequired(true)
-    )
-    .addUserOption(o =>
-      o.setName('novo_proprietario').setDescription('Usuário que receberá o veículo').setRequired(true)
-    )
-    .addStringOption(o =>
-      o.setName('comprovante').setDescription('Link do comprovante da transação').setRequired(true)
-    ),
+    .setDescription('Abre sua garagem e transfere um veículo para outro usuário.'),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    const veiculos = buscarVeiculosPorProprietario(interaction.user.id);
 
-    const placa = interaction.options.getString('placa');
-    const novoProprietario = interaction.options.getUser('novo_proprietario');
-    const comprovante = interaction.options.getString('comprovante');
-
-    const veiculo = buscarVeiculoPorPlaca(placa);
-    if (!veiculo) {
-      return interaction.editReply({ content: `❌ Nenhum veículo ativo encontrado com a placa **${placa}**.` });
+    if (veiculos.length === 0) {
+      return interaction.reply({
+        flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+        components: [{
+          type: 17,
+          accent_color: cores.vermelho,
+          components: [
+            { type: 10, content: `## ${em.vendido} GARAGEM VAZIA\n> Você não possui veículos registrados no seu nome.` },
+          ],
+        }],
+      });
     }
 
-    if (veiculo.comprador_id !== interaction.user.id) {
-      return interaction.editReply({ content: '❌ Você não é o proprietário registrado deste veículo.' });
-    }
+    const components = [];
 
-    if (novoProprietario.id === interaction.user.id) {
-      return interaction.editReply({ content: '❌ Você não pode transferir o veículo para si mesmo.' });
-    }
-
-    const agora = Date.now();
-    const exProprietarioId = veiculo.comprador_id;
-
-    const historicoAtualizado = [
-      ...veiculo.historico_proprietarios,
-      { id: novoProprietario.id, desde: agora },
-    ];
-
-    atualizarVeiculo(veiculo.vin, {
-      comprador_id: novoProprietario.id,
-      historico_proprietarios: historicoAtualizado,
+    // Cabeçalho da garagem
+    components.push({
+      type: 10,
+      content:
+        `## ${em.carro} GARAGEM — <@${interaction.user.id}>\n` +
+        `-# ${veiculos.length} veículo(s) registrado(s) · Selecione um para transferir`,
     });
+    components.push({ type: 14, divider: true, spacing: 1 });
 
-    const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
-    await canal.send(
-      msgTransferencia({
-        v: veiculo,
-        exProprietarioId,
-        novoProprietarioId: novoProprietario.id,
-        comprovante,
-      })
-    );
+    // Card por veículo
+    for (const v of veiculos) {
+      const data = new Date(v.data_registro).toLocaleDateString('pt-BR');
 
-    await notificar911(interaction.client, {
-      tipo: 'transferencia',
-      discord_id: novoProprietario.id,
-      placa: veiculo.placa,
-      vin: veiculo.vin,
-      modelo: `${veiculo.veiculo} ${veiculo.modelo}`,
-    });
+      const cardSection = {
+        type: 9,
+        components: [{
+          type: 10,
+          content:
+            `### ${em.rpc2} ${v.veiculo}\n` +
+            `> ${em.rpw} **Versão:** ${v.modelo || 'N/A'}\n` +
+            `> ${em.rpw} **Placa:** \`${v.placa}\`\n` +
+            `> ${em.rpw} **Classe:** ${v.classe || 'N/A'}\n` +
+            `> ${em.rpc} **VIN:** \`${v.vin}\`\n` +
+            `-# Registrado em ${data}`,
+        }],
+      };
 
-    await interaction.editReply({
-      content: `✅ Veículo **${veiculo.placa}** transferido com sucesso para <@${novoProprietario.id}>.`,
+      // Foto como thumbnail se disponível
+      if (v.foto_url) {
+        cardSection.accessory = { type: 11, media: { url: v.foto_url } };
+      }
+
+      components.push(cardSection);
+
+      // Botões do card
+      const botoes = [{
+        type: 2,
+        style: 4,
+        label: 'Transferir',
+        emoji: { id: '1499866159409922199' },
+        custom_id: `btn_transferir:${v.vin}`,
+      }];
+
+      if (v.link_registro) {
+        botoes.push({
+          type: 2,
+          style: 5,
+          label: 'Ver registro',
+          emoji: { id: '1480328653186400326' },
+          url: v.link_registro,
+        });
+      }
+
+      components.push({ type: 1, components: botoes });
+      components.push({ type: 14, divider: true, spacing: 1 });
+    }
+
+    return interaction.reply({
+      flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+      components: [{
+        type: 17,
+        accent_color: cores.azul,
+        components,
+      }],
     });
   },
 };
