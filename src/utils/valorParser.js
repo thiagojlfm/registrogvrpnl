@@ -42,8 +42,9 @@ function extrairValorEmbed(embed) {
   if (embed.title) textos.push(embed.title);
 
   for (const texto of textos) {
-    const match = texto.match(/\$[\d.,]+/);
-    if (match) return match[0];
+    // Captura "$10,000", "$ 10,000", "$10.000", etc.
+    const match = texto.match(/\$\s*[\d.,]+/);
+    if (match) return match[0].replace(/\s/g, '');
   }
   return null;
 }

@@ -30,21 +30,34 @@ module.exports = {
       return interaction.editReply({ content: '❌ Não foi possível acessar o canal/tópico atual.' });
     }
 
-    // Busca histórico do tópico (até 100 mensagens)
-    let mensagens;
+    // Fix 1: busca as mensagens mais antigas primeiro (primeira msg do comprador = modelo do veículo)
+    let mensagensAntigas, mensagensRecentes;
     try {
-      const colecao = await topico.messages.fetch({ limit: 100 });
-      mensagens = [...colecao.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+      const [colAntiga, colRecente] = await Promise.all([
+        topico.messages.fetch({ limit: 50, after: '0' }),
+        topico.messages.fetch({ limit: 50 }),
+      ]);
+      mensagensAntigas = [...colAntiga.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+      mensagensRecentes = [...colRecente.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
     } catch (err) {
       console.error('[autorizar_venda] Erro ao buscar histórico:', err.message);
       return interaction.editReply({ content: '❌ Não foi possível ler o histórico do tópico.' });
     }
 
-    // Encontra mensagem de pagamento do UnbelievaBoat (recente, máx 2h)
+    // Deduplica unindo as duas buscas
+    const mapaMsg = new Map();
+    [...mensagensAntigas, ...mensagensRecentes].forEach(m => mapaMsg.set(m.id, m));
+    const todasMensagens = [...mapaMsg.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+    // Fix 2: encontra confirmação de pagamento do UnbelievaBoat (máx 2h, qualquer formato)
     const agora = Date.now();
-    const msgPagamento = mensagens.find(
-      m => m.author.id === idBotEconomia && (agora - m.createdTimestamp) <= DOIS_HORAS_MS
-    );
+    const msgPagamento = todasMensagens.find(m => {
+      if (m.author.id !== idBotEconomia) return false;
+      if ((agora - m.createdTimestamp) > DOIS_HORAS_MS) return false;
+      const textoEmbed = m.embeds?.[0]?.description || m.embeds?.[0]?.title || '';
+      const textoContent = m.content || '';
+      return textoEmbed.includes('has received') || textoContent.includes('has received');
+    });
 
     if (!msgPagamento) {
       return interaction.editReply({
@@ -52,22 +65,23 @@ module.exports = {
       });
     }
 
-    // Extrai valor do embed do UnbelievaBoat
+    // Extrai valor — tenta embed primeiro, depois content
     const embed = msgPagamento.embeds?.[0];
-    const valorPago = embed ? extrairValorEmbed(embed) : null;
+    let valorPago = embed ? extrairValorEmbed(embed) : null;
+    if (!valorPago && msgPagamento.content) {
+      const match = msgPagamento.content.match(/\$\s*[\d.,]+/);
+      if (match) valorPago = match[0].replace(/\s/g, '');
+    }
 
-    // Extrai nome do veículo da primeira mensagem do comprador no tópico
-    const primeiraMsgComprador = mensagens.find(m => m.author.id === comprador.id && m.content?.trim());
+    // Fix 1: primeira mensagem do comprador no tópico (ordenado ascendente = mais antiga primeiro)
+    const primeiraMsgComprador = mensagensAntigas.find(m => m.author.id === comprador.id && m.content?.trim());
     const veiculoTexto = primeiraMsgComprador?.content?.split('\n')[0]?.trim() || 'Não identificado';
 
     // Extrai foto do tópico (primeiro attachment de qualquer mensagem)
     let fotoUrl = null;
-    for (const msg of mensagens) {
+    for (const msg of todasMensagens) {
       const att = msg.attachments.first();
-      if (att && att.contentType?.startsWith('image/')) {
-        fotoUrl = att.url;
-        break;
-      }
+      if (att && att.contentType?.startsWith('image/')) { fotoUrl = att.url; break; }
     }
 
     // Heurística: separa veículo e modelo pelo ano (4 dígitos)
@@ -88,15 +102,14 @@ module.exports = {
       return interaction.editReply({ content: '❌ Erro ao gerar VIN. Tente novamente.' });
     }
 
-    // Salva pendente para o comprador
-    const comprovanteLink = `https://discord.com/channels/${interaction.guildId}/${topico.id}/${msgPagamento.id}`;
+    // Fix 3: usa message.url da mensagem do UnbelievaBoat como comprovante
     setPendente(comprador.id, {
       vin,
       importador_id: interaction.user.id,
       veiculo: veiculoNome,
       modelo: modeloNome,
       obs: '',
-      comprovante: comprovanteLink,
+      comprovante: msgPagamento.url,
       valor_pago: valorPago || 'N/A',
       foto_sugerida: fotoUrl,
       criado_em: Date.now(),
