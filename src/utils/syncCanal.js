@@ -10,19 +10,32 @@ function extrairTexto(components = []) {
   return texto;
 }
 
-function parsearRegistro(texto, msgUrl, msgTimestamp) {
+function extrairFotoUrl(components = []) {
+  for (const c of components) {
+    if (c.type === 12 && c.items?.length) return c.items[0].media?.url || null;
+    if (c.components) {
+      const found = extrairFotoUrl(c.components);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function parsearRegistro(texto, msgUrl, msgTimestamp, rawComponents) {
   const get = (pattern) => {
     const m = texto.match(pattern);
     return m ? m[1].trim() : null;
   };
 
+  const strip = (s) => s ? s.replace(/\*\*/g, '').trim() : s;
+
   const compradorId = get(/<@(\d+)>/);
   const vin         = get(/VIN Number[:\s*`]+([0-9]+)/);
-  const placa       = get(/Placa[:\s*`]+([A-Za-z0-9\-]+)/);
-  const veiculo     = get(/Ano, marca, modelo[:\s]+(.+)/);
-  const modelo      = get(/Versão[:\s]+(.+)/);
-  const cor         = get(/Coloração[:\s]+(.+)/);
-  const classe      = get(/Classe[:\s]+(?!N\/A)(.+)/);
+  const placa       = strip(get(/Placa[:\s*`]+([A-Za-z0-9\-]+)/));
+  const veiculo     = strip(get(/Ano, marca, modelo[:\s]+(.+)/));
+  const modelo      = strip(get(/Versão[:\s]+(.+)/));
+  const cor         = strip(get(/Coloração[:\s]+(.+)/));
+  const classe      = strip(get(/Classe[:\s]+(?!N\/A)(.+)/));
 
   // Empresarial
   const empresa     = get(/Nome da empresa[:\s]+(.+)/);
@@ -51,7 +64,7 @@ function parsearRegistro(texto, msgUrl, msgTimestamp) {
     comprovante: comprovante || null,
     comprovante_recompra: comprovanteRecompra || null,
     valor_pago: null,
-    foto_url: null,
+    foto_url: extrairFotoUrl(rawComponents),
     link_registro: msgUrl,
     tipo,
     empresa: empresa || null,
@@ -63,10 +76,13 @@ function parsearRegistro(texto, msgUrl, msgTimestamp) {
   };
 }
 
-async function sincronizarCanal(client) {
+async function sincronizarCanal(client, { reconciliar = false } = {}) {
   const canal = await client.channels.fetch(canalRegistroVeicularId);
   const veiculosExistentes = lerVeiculos();
-  const vinsExistentes = new Set(veiculosExistentes.map(v => v.vin));
+  const vinsExistentes = new Map(veiculosExistentes.map(v => [v.vin, v]));
+
+  // VINs encontrados no canal (usado só se reconciliar=true)
+  const vinsNoCanal = new Set();
 
   let novos = 0;
   let before = undefined;
@@ -85,24 +101,66 @@ async function sincronizarCanal(client) {
       const texto = extrairTexto(msg.components);
       if (!texto.includes('VEÍCULO REGISTRADO')) continue;
 
-      const registro = parsearRegistro(texto, msg.url, msg.createdTimestamp);
-      if (!registro || vinsExistentes.has(registro.vin)) continue;
+      const registro = parsearRegistro(texto, msg.url, msg.createdTimestamp, msg.components);
+      if (!registro) continue;
 
-      veiculosExistentes.push(registro);
-      vinsExistentes.add(registro.vin);
-      novos++;
+      if (reconciliar) vinsNoCanal.add(registro.vin);
+
+      if (!vinsExistentes.has(registro.vin)) {
+        vinsExistentes.set(registro.vin, registro);
+        novos++;
+      }
     }
 
     before = mensagens.last()?.id;
     if (mensagens.size < 100) break;
   }
 
-  if (novos > 0) {
-    salvarVeiculos(veiculosExistentes);
-    console.log(`[sync] ${novos} veículo(s) importado(s) do canal.`);
+  let removidos = 0;
+  let lista = [...vinsExistentes.values()];
+
+  // Remove do banco veículos cujos registros foram apagados do canal
+  if (reconciliar) {
+    const antes = lista.length;
+    lista = lista.filter(v => vinsNoCanal.has(v.vin));
+    removidos = antes - lista.length;
   }
 
-  return novos;
+  if (novos > 0 || removidos > 0) {
+    salvarVeiculos(lista);
+    if (novos > 0) console.log(`[sync] ${novos} veículo(s) importado(s) do canal.`);
+    if (removidos > 0) console.log(`[sync] ${removidos} veículo(s) removido(s) (registro apagado do canal).`);
+  }
+
+  return { novos, removidos };
 }
 
-module.exports = { sincronizarCanal };
+function agendarSyncMeiaNoite(client) {
+  const agora = new Date();
+  const proximaMeiaNoite = new Date(agora);
+  proximaMeiaNoite.setHours(24, 0, 0, 0);
+  const msAte = proximaMeiaNoite - agora;
+
+  setTimeout(() => {
+    sincronizarCanal(client, { reconciliar: true })
+      .then(({ novos, removidos }) =>
+        console.log(`[sync/noturno] novos=${novos} removidos=${removidos}`)
+      )
+      .catch(err => console.error('[sync/noturno] Erro:', err));
+
+    // Repete a cada 24h a partir daí
+    setInterval(() => {
+      sincronizarCanal(client, { reconciliar: true })
+        .then(({ novos, removidos }) =>
+          console.log(`[sync/noturno] novos=${novos} removidos=${removidos}`)
+        )
+        .catch(err => console.error('[sync/noturno] Erro:', err));
+    }, 24 * 60 * 60 * 1000);
+  }, msAte);
+
+  const h = String(proximaMeiaNoite.getHours()).padStart(2, '0');
+  const m = String(proximaMeiaNoite.getMinutes()).padStart(2, '0');
+  console.log(`[sync] Próxima reconciliação noturna às ${h}:${m} (em ${Math.round(msAte / 60000)} min)`);
+}
+
+module.exports = { sincronizarCanal, agendarSyncMeiaNoite };

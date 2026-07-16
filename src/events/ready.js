@@ -1,5 +1,6 @@
 const { REST, Routes } = require('discord.js');
 const { token, clientId, guildId } = require('../config/config');
+const { sincronizarCanal, agendarSyncMeiaNoite } = require('../utils/syncCanal');
 const fs = require('fs');
 const path = require('path');
 
@@ -28,5 +29,13 @@ module.exports = {
   async execute(client) {
     console.log(`[ready] Logado como ${client.user.tag}`);
     await registrarComandos();
+
+    // Sync no startup com reconciliação completa (adiciona novos e remove apagados)
+    sincronizarCanal(client, { reconciliar: true })
+      .then(({ novos, removidos }) => console.log(`[sync/startup] novos=${novos} removidos=${removidos}`))
+      .catch(err => console.error('[sync/startup] Erro:', err));
+
+    // Agenda sync de reconciliação toda meia-noite
+    agendarSyncMeiaNoite(client);
   },
 };

@@ -30,8 +30,8 @@ async function abrirModalTransferencia(interaction, vin) {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('novo_proprietario_id')
-          .setLabel('Discord ID do novo proprietário')
-          .setPlaceholder('Cole o ID numérico (ex: 123456789012345678)')
+          .setLabel('Novo proprietário')
+          .setPlaceholder('@nome de usuário, ou cole o ID numérico')
           .setStyle(TextInputStyle.Short)
           .setRequired(true)
       ),
@@ -90,11 +90,30 @@ module.exports = {
       await interaction.deferReply();
 
       const vin = interaction.customId.split(':')[1];
-      const novoId = interaction.fields.getTextInputValue('novo_proprietario_id').trim();
+      const inputUsuario = interaction.fields.getTextInputValue('novo_proprietario_id').trim();
       const comprovante = interaction.fields.getTextInputValue('comprovante').trim();
 
-      if (!/^\d{17,20}$/.test(novoId)) {
-        return interaction.editReply({ content: '❌ ID inválido. Cole apenas os números do Discord ID do novo proprietário.' });
+      let novoId = null;
+
+      // Aceita: <@123>, @nome, nome, ou ID numérico puro
+      const mentionMatch = inputUsuario.match(/^<@!?(\d{17,20})>$/);
+      if (mentionMatch) {
+        novoId = mentionMatch[1];
+      } else if (/^\d{17,20}$/.test(inputUsuario)) {
+        novoId = inputUsuario;
+      } else {
+        // Busca por nome de usuário no servidor
+        const query = inputUsuario.replace(/^@/, '');
+        const members = await interaction.guild.members.search({ query, limit: 5 });
+        const found = members.find(m =>
+          m.user.username.toLowerCase() === query.toLowerCase() ||
+          m.displayName.toLowerCase() === query.toLowerCase()
+        ) || members.first();
+        if (found) novoId = found.id;
+      }
+
+      if (!novoId) {
+        return interaction.editReply({ content: `❌ Usuário **${inputUsuario}** não encontrado no servidor. Tente o nome exato ou cole o ID numérico.` });
       }
 
       const veiculo = buscarVeiculoPorVin(vin);

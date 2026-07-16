@@ -13,11 +13,12 @@ module.exports = {
 
     let veiculos = buscarVeiculosPorProprietario(interaction.user.id);
 
-    // Se não achou nada, escaneia o canal e tenta de novo
+    // Se não achou nada, escaneia o canal (pode ser primeiro uso após deploy)
     if (veiculos.length === 0) {
       await sincronizarCanal(interaction.client);
       veiculos = buscarVeiculosPorProprietario(interaction.user.id);
     }
+
 
     if (veiculos.length === 0) {
       return interaction.editReply({
