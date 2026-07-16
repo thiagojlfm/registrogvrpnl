@@ -5,6 +5,7 @@ const { dbPath } = require('../../config/config');
 const veiculosPath = path.join(dbPath, 'veiculos.json');
 const pendentesPath = path.join(dbPath, 'pendentes.json');
 const pagamentosPath = path.join(dbPath, 'pagamentos_pendentes.json');
+const importsPath = path.join(dbPath, 'imports_processados.json');
 
 const EXPIRY_MS = 30 * 60 * 1000; // 30 minutos
 
@@ -13,6 +14,21 @@ function ensureFiles() {
   if (!fs.existsSync(veiculosPath)) fs.writeFileSync(veiculosPath, '[]');
   if (!fs.existsSync(pendentesPath)) fs.writeFileSync(pendentesPath, '{}');
   if (!fs.existsSync(pagamentosPath)) fs.writeFileSync(pagamentosPath, '[]');
+  if (!fs.existsSync(importsPath)) fs.writeFileSync(importsPath, '[]');
+}
+
+function lerImportsProcessados() {
+  ensureFiles();
+  return new Set(JSON.parse(fs.readFileSync(importsPath, 'utf8')));
+}
+
+function marcarImportProcessado(messageId) {
+  ensureFiles();
+  const ids = JSON.parse(fs.readFileSync(importsPath, 'utf8'));
+  if (!ids.includes(messageId)) {
+    ids.push(messageId);
+    fs.writeFileSync(importsPath, JSON.stringify(ids));
+  }
 }
 
 function lerVeiculos() {
@@ -136,6 +152,8 @@ function limparPagamentosExpirados() {
 }
 
 module.exports = {
+  lerImportsProcessados,
+  marcarImportProcessado,
   lerVeiculos,
   salvarVeiculos,
   lerPendentes,

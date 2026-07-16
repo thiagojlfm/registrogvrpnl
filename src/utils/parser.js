@@ -76,10 +76,11 @@ function parsearMensagemImportacao(message) {
   if (isV2 && message.components?.length > 0) {
     const raw = message.toJSON?.() ?? { components: [] };
     const textoV2 = extrairTextoV2(raw.components)
+      .replace(/<a?:[^:>]+:\d+>/g, '')   // remove emojis customizados <:nome:id>
       .replace(/^>\s*/gm, '')
       .replace(/\*\*/g, '')
+      .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')  // remove __sublinhado__ e _itálico_
       .replace(/#{1,3}\s*/g, '');
-    console.log(`[parser/v2] texto extraído:\n${textoV2.slice(0, 400)}`);
     const doV2 = parseContent(textoV2);
     for (const [k, v] of Object.entries(doV2)) {
       if (!dados[k]) dados[k] = v;

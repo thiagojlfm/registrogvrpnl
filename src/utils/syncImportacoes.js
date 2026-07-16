@@ -1,5 +1,5 @@
 const { canalImportacaoId, idBotImportacao, idBotEconomia } = require('../config/config');
-const { lerVeiculos, lerPendentes, setPendente } = require('../services/database/db');
+const { lerVeiculos, lerPendentes, setPendente, lerImportsProcessados, marcarImportProcessado } = require('../services/database/db');
 const { parsearMensagemImportacao } = require('./parser');
 const { extrairValorEmbed, valoresConferem, parsearUrlDiscord } = require('./valorParser');
 const { gerarVin } = require('./vinGenerator');
@@ -12,14 +12,12 @@ async function sincronizarImportacoes(client) {
   const canal = await client.channels.fetch(canalImportacaoId).catch(() => null);
   if (!canal) { console.log(`[sync/import] canal não encontrado`); return 0; }
 
-  const veiculos   = lerVeiculos();
-  const pendentes  = lerPendentes();
+  const veiculos          = lerVeiculos();
+  const pendentes         = lerPendentes();
+  const importsProcessados = lerImportsProcessados();
 
-  // VINs já registrados e compradores já com pendente ativo
-  const vinsRegistrados    = new Set(veiculos.map(v => v.vin));
-  const compradoresAtivos  = new Set(Object.keys(pendentes));
-  // Compradores que já têm veículo registrado (não precisam de pendente)
-  const compradoresRegist  = new Set(veiculos.map(v => v.comprador_id));
+  // Compradores com pendente ativo (aguardando /registrar_veiculo)
+  const compradoresAtivos = new Set(Object.keys(pendentes));
 
   let gerados = 0;
   let before  = undefined;
@@ -43,13 +41,14 @@ async function sincronizarImportacoes(client) {
 
       if (!rawTexto.includes('IMPORTA')) continue;
 
-      const dados = parsearMensagemImportacao(msg);
-      console.log(`[sync/import] msg ${msg.id} → comprador_id=${dados.comprador_id} comprovante=${dados.comprovante} valor=${dados.valor_pago}`);
+      // Já processado em deploy anterior — não gera VIN duplicado
+      if (importsProcessados.has(msg.id)) continue;
 
-      if (!dados.comprador_id) { console.log(`[sync/import] skip: sem comprador_id`); continue; }
-      if (compradoresAtivos.has(dados.comprador_id)) { console.log(`[sync/import] skip: pendente ativo`); continue; }
-      if (compradoresRegist.has(dados.comprador_id)) { console.log(`[sync/import] skip: ja registrado`); continue; }
-      if (!dados.comprovante?.trim()) { console.log(`[sync/import] skip: sem comprovante`); continue; }
+      const dados = parsearMensagemImportacao(msg);
+
+      if (!dados.comprador_id) continue;
+      if (compradoresAtivos.has(dados.comprador_id)) continue;
+      if (!dados.comprovante?.trim()) continue;
 
       // Valida comprovante
       const ids = parsearUrlDiscord(dados.comprovante);
@@ -68,8 +67,9 @@ async function sincronizarImportacoes(client) {
 
       if (!valorOk) continue;
 
-      // Tudo ok — gera VIN e salva pendente
+      // Tudo ok — gera VIN, salva pendente e marca import como processado
       const vin = gerarVin();
+      marcarImportProcessado(msg.id);
       setPendente(dados.comprador_id, {
         vin,
         importador_id: dados.importador_id || null,
