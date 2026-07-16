@@ -283,10 +283,12 @@ module.exports = {
 
       await notificar911(interaction.client, {
         tipo: 'transferencia',
-        discord_id: novoId,
+        discord_id_novo: novoId,
+        discord_id_anterior: exProprietarioId,
         placa: veiculo.placa,
         vin: veiculo.vin,
         modelo: `${veiculo.veiculo} ${veiculo.modelo || ''}`.trim(),
+        cor: veiculo.cor,
       });
 
       await interaction.editReply(msgConfirmacaoTransferencia({

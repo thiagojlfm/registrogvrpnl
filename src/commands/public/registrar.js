@@ -119,10 +119,12 @@ module.exports = {
 
     await notificar911(interaction.client, {
       tipo: 'registro',
-      discord_id: interaction.user.id,
+      discord_id_novo: interaction.user.id,
+      discord_id_anterior: null,
       placa,
       vin: pendente.vin,
       modelo: `${pendente.veiculo} ${pendente.modelo}`.trim(),
+      cor,
     });
 
     const { MessageFlags } = require('discord.js');
