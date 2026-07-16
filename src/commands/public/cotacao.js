@@ -60,7 +60,7 @@ module.exports = {
 
     const msg = await interaction.editReply(msgPayload);
 
-    // Salva cotação vinculada ao tópico + message_id para rastrear deleção
+    // Salva cotação (auditoria_message_id adicionado após log)
     setCotacao(topicoId, {
       message_id: msg.id,
       atendente_id: interaction.user.id,
@@ -70,13 +70,25 @@ module.exports = {
       data: Date.now(),
     });
 
-    // Log na auditoria
-    logCotacao(interaction.client, {
+    // Log na auditoria — salva ID da msg para deletar se cotação for apagada
+    const auditoriaId = await logCotacao(interaction.client, {
       atendenteId: interaction.user.id,
       topicoId,
       topicoNome: interaction.channel?.name || topicoId,
       valor: valorFormatado,
       obs,
-    }).catch(() => {});
+    }).catch(() => null);
+
+    if (auditoriaId) {
+      setCotacao(topicoId, {
+        message_id: msg.id,
+        atendente_id: interaction.user.id,
+        valor_centavos: valorCentavos,
+        valor_str: valorFormatado,
+        obs,
+        data: Date.now(),
+        auditoria_message_id: auditoriaId,
+      });
+    }
   },
 };

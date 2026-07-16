@@ -181,10 +181,11 @@ function getCotacao(topicoId) {
 function removerCotacaoPorMensagem(messageId) {
   const cotacoes = lerCotacoes();
   const topicoId = Object.keys(cotacoes).find(k => cotacoes[k].message_id === messageId);
-  if (!topicoId) return false;
+  if (!topicoId) return null;
+  const dados = cotacoes[topicoId];
   delete cotacoes[topicoId];
   salvarCotacoes(cotacoes);
-  return true;
+  return dados; // retorna dados incluindo auditoria_message_id
 }
 
 // ── Comissões ─────────────────────────────────────────────────────────────────

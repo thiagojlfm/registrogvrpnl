@@ -170,20 +170,28 @@ async function logPendente(client, { comprador_id, pendente }) {
 // ── Cotação registrada ────────────────────────────────────────────────────────
 
 async function logCotacao(client, { atendenteId, topicoId, topicoNome, valor, obs }) {
-  await postar(client, {
-    flags: v2(),
-    components: [container(cores.amarelo, [
-      text(`## 💰 COTAÇÃO REGISTRADA`),
-      sep(),
-      text(
-        `> ${dot} **Atendente:** <@${atendenteId}>\n` +
-        `> ${dot} **Tópico:** <#${topicoId}> (${topicoNome})\n` +
-        `> ${dot} **Valor cotado:** ${valor}\n` +
-        (obs ? `> ${dot} **Observação:** ${obs}\n` : '') +
-        `-# Log gerado automaticamente · ${ts()}`
-      ),
-    ])],
-  });
+  if (!canalAuditoriaId) return null;
+  try {
+    const canal = await client.channels.fetch(canalAuditoriaId);
+    const msg = await canal.send({
+      flags: v2(),
+      components: [container(cores.amarelo, [
+        text(`## 💰 COTAÇÃO REGISTRADA`),
+        sep(),
+        text(
+          `> ${dot} **Atendente:** <@${atendenteId}>\n` +
+          `> ${dot} **Tópico:** <#${topicoId}> (${topicoNome})\n` +
+          `> ${dot} **Valor cotado:** ${valor}\n` +
+          (obs ? `> ${dot} **Observação:** ${obs}\n` : '') +
+          `-# Log gerado automaticamente · ${ts()}`
+        ),
+      ])],
+    });
+    return msg.id;
+  } catch (err) {
+    console.error('[auditoria] Erro ao logar cotação:', err.message);
+    return null;
+  }
 }
 
 // ── Comissão registrada ───────────────────────────────────────────────────────
