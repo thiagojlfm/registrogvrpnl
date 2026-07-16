@@ -1,0 +1,61 @@
+/**
+ * Converte string monetária para número inteiro de centavos.
+ * Suporta: "$45.563", "$45,563", "45563", "45.563,00", etc.
+ */
+function normalizarValor(str) {
+  if (!str) return null;
+  const s = String(str).replace(/[^0-9.,]/g, '');
+  if (!s) return null;
+
+  // Formato BR: 45.563,00 → separador decimal é vírgula
+  if (s.includes(',') && s.lastIndexOf(',') > s.lastIndexOf('.')) {
+    const norm = s.replace(/\./g, '').replace(',', '.');
+    return Math.round(parseFloat(norm) * 100);
+  }
+
+  // Formato US: 45,563.00 → separador decimal é ponto
+  if (s.includes('.') && s.lastIndexOf('.') > s.lastIndexOf(',')) {
+    const norm = s.replace(/,/g, '');
+    return Math.round(parseFloat(norm) * 100);
+  }
+
+  // Sem separador decimal explícito
+  return Math.round(parseFloat(s.replace(/,/g, '')) * 100);
+}
+
+function valoresConferem(valorA, valorB) {
+  if (!valorA || !valorB) return false;
+  const a = normalizarValor(valorA);
+  const b = normalizarValor(valorB);
+  if (a === null || b === null) return false;
+  return a === b;
+}
+
+/**
+ * Extrai o valor monetário de um embed do UnbelievaBoat.
+ * Tenta description e fields em busca de "$XXX".
+ */
+function extrairValorEmbed(embed) {
+  const textos = [];
+  if (embed.description) textos.push(embed.description);
+  if (embed.fields) embed.fields.forEach(f => { textos.push(f.name); textos.push(f.value); });
+  if (embed.title) textos.push(embed.title);
+
+  for (const texto of textos) {
+    const match = texto.match(/\$[\d.,]+/);
+    if (match) return match[0];
+  }
+  return null;
+}
+
+/**
+ * Extrai IDs de uma URL de mensagem do Discord.
+ * https://discord.com/channels/GUILD/CHANNEL/MESSAGE
+ */
+function parsearUrlDiscord(url) {
+  const match = url.match(/discord\.com\/channels\/(\d+)\/(\d+)\/(\d+)/);
+  if (!match) return null;
+  return { guildId: match[1], channelId: match[2], messageId: match[3] };
+}
+
+module.exports = { normalizarValor, valoresConferem, extrairValorEmbed, parsearUrlDiscord };

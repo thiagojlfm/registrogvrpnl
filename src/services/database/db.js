@@ -4,11 +4,15 @@ const { dbPath } = require('../../config/config');
 
 const veiculosPath = path.join(dbPath, 'veiculos.json');
 const pendentesPath = path.join(dbPath, 'pendentes.json');
+const pagamentosPath = path.join(dbPath, 'pagamentos_pendentes.json');
+
+const EXPIRY_MS = 30 * 60 * 1000; // 30 minutos
 
 function ensureFiles() {
   if (!fs.existsSync(dbPath)) fs.mkdirSync(dbPath, { recursive: true });
   if (!fs.existsSync(veiculosPath)) fs.writeFileSync(veiculosPath, '[]');
   if (!fs.existsSync(pendentesPath)) fs.writeFileSync(pendentesPath, '{}');
+  if (!fs.existsSync(pagamentosPath)) fs.writeFileSync(pagamentosPath, '[]');
 }
 
 function lerVeiculos() {
@@ -87,6 +91,50 @@ function removerPendente(discordId) {
   salvarPendentes(pendentes);
 }
 
+// ── Pagamentos pendentes (fluxo conce direto) ────────────────────────────────
+
+function lerPagamentos() {
+  ensureFiles();
+  return JSON.parse(fs.readFileSync(pagamentosPath, 'utf8'));
+}
+
+function salvarPagamentos(pagamentos) {
+  ensureFiles();
+  fs.writeFileSync(pagamentosPath, JSON.stringify(pagamentos, null, 2));
+}
+
+function adicionarPagamento(dados) {
+  const pagamentos = lerPagamentos();
+  // Remove pagamento anterior não usado do mesmo payer (sobrescreve)
+  const filtrado = pagamentos.filter(p => p.payer_id !== dados.payer_id);
+  filtrado.push(dados);
+  salvarPagamentos(filtrado);
+}
+
+function getPagamentoPendente(payerId) {
+  const pagamentos = lerPagamentos();
+  const agora = Date.now();
+  return pagamentos.find(
+    p => p.payer_id === payerId && !p.usado && (agora - p.timestamp) < EXPIRY_MS
+  ) || null;
+}
+
+function marcarPagamentoUsado(payerId) {
+  const pagamentos = lerPagamentos();
+  const idx = pagamentos.findIndex(p => p.payer_id === payerId && !p.usado);
+  if (idx === -1) return false;
+  pagamentos[idx].usado = true;
+  salvarPagamentos(pagamentos);
+  return true;
+}
+
+function limparPagamentosExpirados() {
+  const pagamentos = lerPagamentos();
+  const agora = Date.now();
+  const ativos = pagamentos.filter(p => !p.usado && (agora - p.timestamp) < EXPIRY_MS);
+  salvarPagamentos(ativos);
+}
+
 module.exports = {
   lerVeiculos,
   salvarVeiculos,
@@ -101,4 +149,9 @@ module.exports = {
   getPendente,
   setPendente,
   removerPendente,
+  lerPagamentos,
+  adicionarPagamento,
+  getPagamentoPendente,
+  marcarPagamentoUsado,
+  limparPagamentosExpirados,
 };

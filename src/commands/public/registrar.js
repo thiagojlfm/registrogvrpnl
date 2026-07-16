@@ -1,13 +1,13 @@
-const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { canalRegistroVeicularId } = require('../../config/config');
-const { getPendente, removerPendente, adicionarVeiculo } = require('../../services/database/db');
+const { getPendente, removerPendente, adicionarVeiculo, atualizarVeiculo } = require('../../services/database/db');
 const { msgRegistroOficial } = require('../../utils/formatter');
 const { notificar911 } = require('../../services/notificar911');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('registrar_veiculo')
-    .setDescription('Finaliza o registro oficial do seu veículo importado.')
+    .setDescription('Finaliza o registro oficial do seu veículo.')
     .addStringOption(o =>
       o.setName('placa').setDescription('Placa do veículo (ex: ABC-1234)').setRequired(true)
     )
@@ -38,7 +38,9 @@ module.exports = {
 
     const pendente = getPendente(interaction.user.id);
     if (!pendente) {
-      return interaction.editReply({ content: '❌ Nenhuma importação pendente encontrada para o seu usuário.' });
+      return interaction.editReply({
+        content: '❌ Nenhuma venda ou importação pendente encontrada para o seu usuário.\nAguarde a autorização do atendente ou a confirmação da importação.',
+      });
     }
 
     const placa = interaction.options.getString('placa');
@@ -52,7 +54,6 @@ module.exports = {
       return interaction.editReply({ content: '❌ Para registro empresarial, informe **empresa_nome** e **empresa_link**.' });
     }
 
-    const fotoUrl = foto.url;
     const agora = Date.now();
 
     const veiculo = {
@@ -67,7 +68,7 @@ module.exports = {
       obs: pendente.obs,
       comprovante: pendente.comprovante,
       valor_pago: pendente.valor_pago,
-      foto_url: fotoUrl,
+      foto_url: foto.url,
       link_registro: null,
       tipo,
       empresa: empresaNome || null,
@@ -84,7 +85,6 @@ module.exports = {
     const msgPublicada = await canal.send(msgRegistroOficial(veiculo));
 
     const linkRegistro = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgPublicada.id}`;
-    const { atualizarVeiculo } = require('../../services/database/db');
     atualizarVeiculo(pendente.vin, { link_registro: linkRegistro });
 
     await notificar911(interaction.client, {
@@ -92,7 +92,7 @@ module.exports = {
       discord_id: interaction.user.id,
       placa,
       vin: pendente.vin,
-      modelo: `${pendente.veiculo} ${pendente.modelo}`,
+      modelo: `${pendente.veiculo} ${pendente.modelo}`.trim(),
     });
 
     await interaction.editReply({

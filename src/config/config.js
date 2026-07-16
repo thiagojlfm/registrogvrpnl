@@ -5,8 +5,10 @@ module.exports = {
   clientId: process.env.CLIENT_ID,
   guildId: process.env.GUILD_ID,
   idBotImportacao: process.env.ID_BOT_IMPORTACAO,
+  idBotEconomia: process.env.ID_BOT_ECONOMIA,
   canalImportacaoId: process.env.CANAL_IMPORTACAO_ID,
   canalRegistroVeicularId: process.env.CANAL_REGISTRO_VEICULAR_ID,
+  cargoAtendente: process.env.CARGO_ATENDENTE_ID,
   idBot911: process.env.ID_BOT_911,
   dbPath: process.env.DB_PATH || './data',
 
