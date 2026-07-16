@@ -38,8 +38,10 @@ function valoresConferem(valorA, valorB) {
 function extrairValorEmbed(embed) {
   const textos = [];
   if (embed.description) textos.push(embed.description);
-  if (embed.fields) embed.fields.forEach(f => { textos.push(f.name); textos.push(f.value); });
   if (embed.title) textos.push(embed.title);
+  if (embed.author?.name) textos.push(embed.author.name);
+  if (embed.footer?.text) textos.push(embed.footer.text);
+  if (embed.fields) embed.fields.forEach(f => { textos.push(f.name); textos.push(f.value); });
 
   for (const texto of textos) {
     // Captura "$10,000", "$ 10,000", "$10.000", etc.

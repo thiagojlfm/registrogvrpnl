@@ -65,17 +65,33 @@ module.exports = {
       });
     }
 
-    // Extrai valor — tenta embed primeiro, depois content
+    // Extrai valor — tenta embed (todos os campos), depois content, depois mensagem do !pay
     const embed = msgPagamento.embeds?.[0];
     let valorPago = embed ? extrairValorEmbed(embed) : null;
+
+    // Fallback: content da mensagem do UnbelievaBoat
     if (!valorPago && msgPagamento.content) {
-      const match = msgPagamento.content.match(/\$\s*[\d.,]+/);
-      if (match) valorPago = match[0].replace(/\s/g, '');
+      const m = msgPagamento.content.match(/\$\s*[\d.,]+/);
+      if (m) valorPago = m[0].replace(/\s/g, '');
     }
 
-    // Fix 1: primeira mensagem do comprador no tópico (ordenado ascendente = mais antiga primeiro)
+    // Fallback: mensagem do !pay enviada por qualquer usuário no tópico
+    if (!valorPago) {
+      const msgPay = todasMensagens.find(m => /!pay\b/i.test(m.content));
+      if (msgPay) {
+        const m = msgPay.content.match(/\b\d[\d.,]*\b/g);
+        if (m) valorPago = `$${m[m.length - 1]}`; // último número = valor
+      }
+    }
+
+    // Fix 1: primeira mensagem do comprador — pula linhas que são só menções (@Usuario ou <@id>)
     const primeiraMsgComprador = mensagensAntigas.find(m => m.author.id === comprador.id && m.content?.trim());
-    const veiculoTexto = primeiraMsgComprador?.content?.split('\n')[0]?.trim() || 'Não identificado';
+    const linhasComprador = (primeiraMsgComprador?.content || '')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !l.match(/^<@!?\d+>$/) && !l.startsWith('@'));
+    const veiculoTexto = linhasComprador[0] || 'Não identificado';
+    const modeloExtra = linhasComprador[1] || '';
 
     // Extrai foto do tópico (primeiro attachment de qualquer mensagem)
     let fotoUrl = null;
@@ -84,16 +100,16 @@ module.exports = {
       if (att && att.contentType?.startsWith('image/')) { fotoUrl = att.url; break; }
     }
 
-    // Heurística: separa veículo e modelo pelo ano (4 dígitos)
+    // Separa veículo e modelo: ano (4 dígitos) divide o texto; linha 2 vira modelo se existir
     const partes = veiculoTexto.split(/\s+/);
     const anoIdx = partes.findIndex(p => /^\d{4}$/.test(p));
     let veiculoNome, modeloNome;
     if (anoIdx > 0) {
       veiculoNome = partes.slice(0, anoIdx).join(' ');
-      modeloNome = partes.slice(anoIdx).join(' ');
+      modeloNome = [partes.slice(anoIdx).join(' '), modeloExtra].filter(Boolean).join(' ');
     } else {
       veiculoNome = veiculoTexto;
-      modeloNome = '';
+      modeloNome = modeloExtra;
     }
 
     // Gera VIN
