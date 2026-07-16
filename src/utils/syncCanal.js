@@ -96,9 +96,8 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
   const veiculosExistentes = lerVeiculos();
   const vinsExistentes = new Map(veiculosExistentes.map(v => [v.vin, v]));
   const vinsNoCanal = new Set();
-
-  // Mapa vin → última transferência encontrada no canal (mais recente primeiro)
   const transferenciasNoCanal = new Map();
+  const todasMsgsRegistro = []; // mensagens brutas de VEÍCULO REGISTRADO
 
   let novos = 0;
   let before = undefined;
@@ -119,7 +118,10 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
       if (texto.includes('VEÍCULO REGISTRADO')) {
         const registro = parsearRegistro(texto, msg.url, msg.createdTimestamp, msg.components);
         if (!registro) continue;
-        if (reconciliar) vinsNoCanal.add(registro.vin);
+        if (reconciliar) {
+          vinsNoCanal.add(registro.vin);
+          todasMsgsRegistro.push(msg);
+        }
         if (!vinsExistentes.has(registro.vin)) {
           vinsExistentes.set(registro.vin, registro);
           novos++;
@@ -128,7 +130,6 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
 
       if (texto.includes('TRANSFERÊNCIA DE VEÍCULO')) {
         const t = parsearTransferencia(texto);
-        // Guarda apenas a mais recente (mensagens vêm da mais nova para mais antiga)
         if (t && !transferenciasNoCanal.has(t.vin)) {
           transferenciasNoCanal.set(t.vin, t);
         }
@@ -137,6 +138,25 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
 
     before = mensagens.last()?.id;
     if (mensagens.size < 100) break;
+  }
+
+  // Remove botão "Transferir veículo" de mensagens de registro que ainda o têm
+  if (reconciliar) {
+    for (const msg of todasMsgsRegistro) {
+      const temBotao = msg.components?.some(c =>
+        c.components?.some(b => b.customId?.startsWith('btn_transferir:'))
+      );
+      if (!temBotao) continue;
+      try {
+        const texto = extrairTexto(msg.components);
+        const registro = parsearRegistro(texto, msg.url, msg.createdTimestamp, msg.components);
+        if (!registro) continue;
+        const vDb = vinsExistentes.get(registro.vin);
+        await msg.edit(msgRegistroOficial(vDb || registro));
+      } catch (e) {
+        console.error(`[sync] Erro ao remover botão de ${msg.url}:`, e.message);
+      }
+    }
   }
 
   // Aplica transferências ao banco SEMPRE (independente de reconciliar)

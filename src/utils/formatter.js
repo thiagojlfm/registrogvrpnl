@@ -89,17 +89,6 @@ function msgRegistroOficial(v) {
 
   components.push(sep());
   components.push(text(`-# Registro gerado automaticamente · ${data}`));
-  components.push({
-    type: 1,
-    components: [
-      {
-        type: 2,
-        style: 4,
-        label: '🔄 Transferir veículo',
-        custom_id: `btn_transferir:${v.vin}`,
-      },
-    ],
-  });
 
   return {
     flags: v2(),
