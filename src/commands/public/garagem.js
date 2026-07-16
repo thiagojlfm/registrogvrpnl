@@ -4,7 +4,7 @@ const { cores, emojis: em } = require('../../config/config');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('transferir_veiculo')
+    .setName('garagem')
     .setDescription('Abre sua garagem e transfere um veículo para outro usuário.'),
 
   async execute(interaction) {
