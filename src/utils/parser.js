@@ -79,6 +79,7 @@ function parsearMensagemImportacao(message) {
       .replace(/^>\s*/gm, '')
       .replace(/\*\*/g, '')
       .replace(/#{1,3}\s*/g, '');
+    console.log(`[parser/v2] texto extraído:\n${textoV2.slice(0, 400)}`);
     const doV2 = parseContent(textoV2);
     for (const [k, v] of Object.entries(doV2)) {
       if (!dados[k]) dados[k] = v;
