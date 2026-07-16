@@ -29,9 +29,10 @@ module.exports = {
     )
     .addStringOption(o =>
       o.setName('classe')
-        .setDescription('Classe do veículo')
+        .setDescription('Classe do veículo (deixe vazio ou escolha Nenhuma se não se aplicar)')
         .setRequired(false)
         .addChoices(
+          { name: 'Nenhuma / N/A', value: 'none' },
           { name: 'Sports', value: 'Sports' },
           { name: 'Luxury', value: 'Luxury' },
           { name: 'Classic', value: 'Classic' },
@@ -83,7 +84,7 @@ module.exports = {
       modelo: pendente.modelo,
       cor,
       placa,
-      classe: classe || pendente.classe || null,
+      classe: (classe && classe !== 'none') ? classe : (pendente.classe || null),
       categoria: pendente.categoria || null,
       obs: pendente.obs,
       link_cotacao: pendente.link_cotacao || null,

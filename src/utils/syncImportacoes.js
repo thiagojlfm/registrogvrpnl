@@ -59,9 +59,14 @@ async function sincronizarImportacoes(client) {
         const canalComp = await client.channels.fetch(ids.channelId);
         const msgComp   = await canalComp.messages.fetch(ids.messageId);
         if (msgComp.author.id === idBotEconomia) {
+          // Comprovante aponta para confirmação do bot de economia → valida valor
           const embed      = msgComp.embeds?.[0];
           const valorEmbed = embed ? extrairValorEmbed(embed) : null;
           valorOk = !dados.valor_pago || valoresConferem(valorEmbed, dados.valor_pago);
+        } else {
+          // Comprovante aponta para mensagem do atendente/bot interno → importação já foi
+          // validada manualmente, aceita sem comparação de valor
+          valorOk = true;
         }
       } catch { continue; }
 
