@@ -149,7 +149,13 @@ module.exports = {
       const exProprietarioId = veiculo.comprador_id;
       const historico = [...(veiculo.historico_proprietarios || []), { id: novoId, desde: Date.now() }];
 
-      atualizarVeiculo(vin, { comprador_id: novoId, historico_proprietarios: historico });
+      atualizarVeiculo(vin, {
+        comprador_id: novoId,
+        historico_proprietarios: historico,
+        comprovante: comprovante,          // comprovante do novo dono
+        link_cotacao: null,                // cotação era do dono anterior
+        comprovante_recompra: null,        // recompra era do dono anterior
+      });
 
       // Edita a mensagem de registro original para refletir o novo proprietário
       if (veiculo.link_registro) {
@@ -157,9 +163,15 @@ module.exports = {
           const { channelId, messageId } = parsearUrlDiscord(veiculo.link_registro);
           const canalReg = await interaction.client.channels.fetch(channelId);
           const msgReg = await canalReg.messages.fetch(messageId);
-          const veiculoAtualizado = { ...veiculo, comprador_id: novoId, historico_proprietarios: historico };
-          // Atualiza ex-proprietário na seção pessoal
-          veiculoAtualizado._ex_proprietario_id = exProprietarioId;
+          const veiculoAtualizado = {
+            ...veiculo,
+            comprador_id: novoId,
+            historico_proprietarios: historico,
+            comprovante,
+            link_cotacao: null,
+            comprovante_recompra: null,
+            _ex_proprietario_id: exProprietarioId,
+          };
           await msgReg.edit(msgRegistroOficial(veiculoAtualizado));
         } catch (e) {
           console.error('[transferencia] Não foi possível editar o registro original:', e.message);

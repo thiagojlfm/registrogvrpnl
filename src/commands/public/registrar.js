@@ -99,7 +99,7 @@ module.exports = {
       empresa: empresaNome || null,
       empresa_link: empresaLink || null,
       finalidade: finalidade || null,
-      historico_proprietarios: [{ id: interaction.user.id, desde: agora }],
+      historico_proprietarios: [],
       data_registro: agora,
       ativo: true,
     };
