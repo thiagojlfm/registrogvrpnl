@@ -87,7 +87,7 @@ module.exports = {
 
     // ── Modal: confirmar transferência ───────────────────────────────────────
     if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_transferir:')) {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ ephemeral: false });
 
       const vin = interaction.customId.split(':')[1];
       const novoId = interaction.fields.getTextInputValue('novo_proprietario_id').trim();

@@ -154,7 +154,7 @@ function msgConsulta(veiculos, pessoa) {
 
   return {
     flags: v2(),
-    ephemeral: true,
+    ephemeral: false,
     components: [
       container(cores.azul, [
         text(

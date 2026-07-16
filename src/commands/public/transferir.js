@@ -12,7 +12,7 @@ module.exports = {
 
     if (veiculos.length === 0) {
       return interaction.reply({
-        flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+        flags: MessageFlags.IsComponentsV2,
         components: [{
           type: 17,
           accent_color: cores.vermelho,
@@ -83,7 +83,7 @@ module.exports = {
     }
 
     return interaction.reply({
-      flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+      flags: MessageFlags.IsComponentsV2,
       components: [{
         type: 17,
         accent_color: cores.azul,

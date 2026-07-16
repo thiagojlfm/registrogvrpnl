@@ -15,7 +15,7 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ ephemeral: false });
 
     const placa = interaction.options.getString('placa');
     const novaFoto = interaction.options.getAttachment('nova_foto');
