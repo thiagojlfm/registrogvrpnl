@@ -41,25 +41,21 @@ module.exports = {
       return;
     }
 
-    // 3. Verificar se é do UnbelievaBoat
-    if (msgComprovante.author.id !== idBotEconomia) {
-      await message.channel.send('⚠️ Importação ignorada: comprovante não reconhecido como pagamento válido.');
-      return;
-    }
-
-    // 4. Verificar valor
-    const embed = msgComprovante.embeds?.[0];
-    if (!embed) {
-      await message.channel.send('⚠️ Importação ignorada: embed de pagamento não encontrado no comprovante.');
-      return;
-    }
-
-    const valorEmbed = extrairValorEmbed(embed);
-    if (!valorEmbed || !valoresConferem(valorEmbed, dados.valor_pago)) {
-      await message.channel.send(
-        `⚠️ Importação ignorada: valor no comprovante (**${valorEmbed || 'não encontrado'}**) não confere com o valor informado (**${dados.valor_pago}**).`
-      );
-      return;
+    // 3. Se for do UnbelievaBoat, valida o valor; caso contrário (msg do atendente/bot
+    //    interno), a importação já foi aprovada manualmente — aceita sem comparação
+    if (msgComprovante.author.id === idBotEconomia) {
+      const embed = msgComprovante.embeds?.[0];
+      if (!embed) {
+        await message.channel.send('⚠️ Importação ignorada: embed de pagamento não encontrado no comprovante.');
+        return;
+      }
+      const valorEmbed = extrairValorEmbed(embed);
+      if (!valorEmbed || !valoresConferem(valorEmbed, dados.valor_pago)) {
+        await message.channel.send(
+          `⚠️ Importação ignorada: valor no comprovante (**${valorEmbed || 'não encontrado'}**) não confere com o valor informado (**${dados.valor_pago}**).`
+        );
+        return;
+      }
     }
 
     // 5. Tudo ok — gera VIN e salva pendente
