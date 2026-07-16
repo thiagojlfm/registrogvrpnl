@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { buscarVeiculoPorPlaca, buscarVeiculosPorProprietario } = require('../../services/database/db');
 const { msgConsulta } = require('../../utils/formatter');
 
@@ -20,7 +20,7 @@ module.exports = {
     if (!placa && !pessoa) {
       return interaction.reply({
         content: '❌ Informe ao menos uma **placa** ou uma **pessoa** para consultar.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -36,13 +36,13 @@ module.exports = {
     if (veiculos.length === 0) {
       return interaction.reply({
         content: '🔍 Nenhum veículo encontrado com os critérios informados.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
     await interaction.reply({
       ...msgConsulta(veiculos, pessoa?.id),
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   },
 };

@@ -71,7 +71,8 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    const { MessageFlags } = require('discord.js');
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const sub = interaction.options.getSubcommand();
 
     // ── forcar_registro ─────────────────────────────────────────────────────
