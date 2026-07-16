@@ -262,7 +262,7 @@ async function recuperarPendentes(client) {
       for (const msg of msgs.values()) {
         if (msg.author.id !== client.user.id) continue;
         const texto = extrairTexto(msg.components);
-        const match = texto.match(/PENDENTE_JSON:(\{.+\})/);
+        const match = texto.match(/PENDENTE_JSON:`?(\{.+\})`?/);
         if (!match) continue;
         try {
           const dados = JSON.parse(match[1]);

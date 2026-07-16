@@ -161,7 +161,7 @@ async function logPendente(client, { comprador_id, pendente }) {
       sep(),
       text(
         `-# 🔒 Aguardando /registrar_veiculo · ${ts()}\n` +
-        `-# PENDENTE_JSON:${JSON.stringify({ comprador_id, ...pendente })}`
+        `-# PENDENTE_JSON:\`${JSON.stringify({ comprador_id, ...pendente })}\``
       ),
     ])],
   });
