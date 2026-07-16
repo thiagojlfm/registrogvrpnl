@@ -152,9 +152,8 @@ module.exports = {
       atualizarVeiculo(vin, {
         comprador_id: novoId,
         historico_proprietarios: historico,
-        comprovante: comprovante,          // comprovante do novo dono
-        link_cotacao: null,                // cotação era do dono anterior
-        comprovante_recompra: null,        // recompra era do dono anterior
+        comprovante_recompra: comprovante,  // pagamento do dono usado (atualiza a cada transferência)
+        // link_cotacao e comprovante (original) são preservados pelo spread do atualizarVeiculo
       });
 
       // Edita a mensagem de registro original para refletir o novo proprietário
@@ -167,9 +166,7 @@ module.exports = {
             ...veiculo,
             comprador_id: novoId,
             historico_proprietarios: historico,
-            comprovante,
-            link_cotacao: null,
-            comprovante_recompra: null,
+            comprovante_recompra: comprovante,
             _ex_proprietario_id: exProprietarioId,
           };
           await msgReg.edit(msgRegistroOficial(veiculoAtualizado));
