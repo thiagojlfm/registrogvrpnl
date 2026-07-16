@@ -59,13 +59,25 @@ function parseContent(content) {
 function parsearMensagemImportacao(message) {
   let dados = {};
 
+  // 1. Embed fields (formato estruturado)
   if (message.embeds?.length > 0 && message.embeds[0].fields?.length > 0) {
     dados = parseEmbedFields(message.embeds[0].fields);
   }
 
-  // Preenche campos ausentes com fallback no content
+  // 2. Embed description (formato "> Campo: valor" ou "Campo: valor")
   const semDados = Object.keys(MAP_CAMPOS).some(k => !dados[k]);
-  if (semDados && message.content) {
+  if (semDados && message.embeds?.[0]?.description) {
+    const descricao = message.embeds[0].description
+      .replace(/^>\s*/gm, '')   // remove "> " do início de cada linha
+      .replace(/\*\*/g, '');    // remove bold markdown
+    const doDesc = parseContent(descricao);
+    for (const [k, v] of Object.entries(doDesc)) {
+      if (!dados[k]) dados[k] = v;
+    }
+  }
+
+  // 3. Fallback no content
+  if (Object.keys(MAP_CAMPOS).some(k => !dados[k]) && message.content) {
     const doContent = parseContent(message.content);
     for (const [k, v] of Object.entries(doContent)) {
       if (!dados[k]) dados[k] = v;
