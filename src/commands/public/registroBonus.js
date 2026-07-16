@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { canalRegistroVeicularId, cargoStaff, cargoBooster, cores } = require('../../config/config');
+const { canalRegistroVeicularId, cores } = require('../../config/config');
 const { adicionarVeiculo, atualizarVeiculo, lerVeiculos, salvarVeiculos, podeTrocarBonus, setBonusCooldown } = require('../../services/database/db');
 const { msgRegistroBonus } = require('../../utils/formatter');
 const { gerarVin } = require('../../utils/vinGenerator');
@@ -45,15 +45,6 @@ module.exports = {
 
   async execute(interaction) {
     const tipo = interaction.options.getString('tipo');
-
-    // Verifica cargo
-    const cargoNecessario = tipo === 'staff' ? cargoStaff : cargoBooster;
-    if (cargoNecessario && !interaction.member.roles.cache.has(cargoNecessario)) {
-      return interaction.reply({
-        content: `❌ Você não tem o cargo necessário para registrar um veículo de **${tipo === 'staff' ? 'Staff' : 'Boost'}**.`,
-        flags: MessageFlags.Ephemeral,
-      });
-    }
 
     // Verifica cooldown de 7 dias
     const { pode, restante } = podeTrocarBonus(interaction.user.id, tipo);
@@ -152,5 +143,17 @@ module.exports = {
         ],
       }],
     });
+
+    // DM de boas-vindas ao usuário
+    const dmTexto = tipo === 'staff'
+      ? `🛡️ **Parabéns, membro da equipe!**\n\nSeu veículo de Staff **${carroStr}${modelo ? ` ${modelo}` : ''}** foi registrado com sucesso no GVRPNL.\n\nPlaca: \`${placa}\` · VIN: \`${vin}\`\n\n> Você pode trocar seu veículo de Staff a cada **7 dias**.\n> [Ver registro](${linkRegistro})`
+      : `🚀 **Obrigado pelo seu apoio ao servidor!**\n\nSeu veículo Booster **${carroStr}${modelo ? ` ${modelo}` : ''}** foi registrado com sucesso no GVRPNL.\n\nPlaca: \`${placa}\` · VIN: \`${vin}\`\n\n> Você pode trocar seu veículo Boost a cada **7 dias**.\n> [Ver registro](${linkRegistro})`;
+
+    try {
+      const dm = await interaction.user.createDM();
+      await dm.send(dmTexto);
+    } catch {
+      // DMs fechadas — sem problema, o registro já foi feito
+    }
   },
 };
