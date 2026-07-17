@@ -259,5 +259,4 @@ async function _executarAutorizacao(interaction, comprador, topico) {
         },
       ],
     });
-  },
-};
+}
