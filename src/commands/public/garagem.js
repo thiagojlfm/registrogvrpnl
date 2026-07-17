@@ -20,10 +20,15 @@ function buildCard(veiculos, idx, userId) {
   components.push({ type: 14, divider: true, spacing: 1 });
 
   // Card do veículo — com foto no canto direito se disponível
+  let tipoTag = '';
+  if (v.tipo_bonus === 'staff')  tipoTag = ' 🛡️ Staff';
+  else if (v.tipo_bonus === 'boost') tipoTag = ' 🚀 Boost';
+  else if (v.tipo === 'empresarial') tipoTag = ' 🏢 Empresarial';
+
   const cardText = {
     type: 10,
     content:
-      `### ${em.rpc2} ${v.veiculo}\n` +
+      `### ${em.rpc2} ${v.veiculo}${tipoTag ? ` ·${tipoTag}` : ''}\n` +
       `> ${em.rpw} **Versão:** ${v.modelo || 'N/A'}\n` +
       `> ${em.rpw} **Placa:** \`${v.placa}\`\n` +
       `> ${em.rpw} **Classe:** ${v.classe || 'N/A'}\n` +

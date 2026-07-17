@@ -212,9 +212,17 @@ function msgRegistroBonus(v) {
 function msgConsulta(veiculos, pessoa) {
   const linhas = veiculos.map(v => {
     const data = new Date(v.data_registro).toLocaleDateString('pt-BR');
+
+    let tag = '';
+    if (v.tipo_bonus === 'staff')  tag = ' 🛡️ **[STAFF]**';
+    else if (v.tipo_bonus === 'boost') tag = ' 🚀 **[BOOST]**';
+
+    const empresaLabel = v.tipo === 'empresarial' ? ` 🏢` : '';
+    const linkLabel = v.link_registro ? ` · [ver registro](${v.link_registro})` : '';
+
     return (
-      `> ${carro} **${v.veiculo} ${v.modelo || ''}** | Placa: \`${v.placa}\` | VIN: \`${v.vin}\`\n` +
-      `> ${rpw} Cor: ${v.cor} | Classe: ${v.classe || 'N/A'} | Registrado em: ${data}`
+      `> ${carro}${tag}${empresaLabel} **${v.veiculo}${v.modelo ? ` ${v.modelo}` : ''}** | Placa: \`${v.placa}\` | VIN: \`${v.vin}\`\n` +
+      `> ${rpw} Cor: ${v.cor} | Classe: ${v.classe || 'N/A'} | Registrado em: ${data}${linkLabel}`
     );
   });
 
