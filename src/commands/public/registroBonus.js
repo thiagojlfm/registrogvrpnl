@@ -31,9 +31,6 @@ module.exports = {
       o.setName('carro').setDescription('Ano, marca e modelo (ex: 2021 Ferrari SF90)').setRequired(true)
     )
     .addStringOption(o =>
-      o.setName('modelo').setDescription('Versão / trim (ex: Stradale)').setRequired(false)
-    )
-    .addStringOption(o =>
       o.setName('placa').setDescription('Placa do veículo (ex: GVR-1234)').setRequired(true)
     )
     .addStringOption(o =>
@@ -41,6 +38,9 @@ module.exports = {
     )
     .addAttachmentOption(o =>
       o.setName('foto').setDescription('Foto do veículo com a placa visível').setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName('modelo').setDescription('Versão / trim (ex: Stradale)').setRequired(false)
     ),
 
   async execute(interaction) {
