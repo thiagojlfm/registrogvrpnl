@@ -139,13 +139,20 @@ module.exports = {
     if (parentId === canalConceOffsaleId) categoria = 'Offsale';
     else if (parentId === canalConceLimitedId) categoria = 'Limited';
 
+    // Bloqueia se não houver cotação registrada no tópico
+    const cotacao = getCotacao(topico.id);
+    if (!cotacao) {
+      return interaction.editReply({
+        content: '❌ Nenhuma cotação registrada neste tópico.\nUse **/cotacao** antes de autorizar a venda.',
+      });
+    }
+
     // Gera VIN
     let vin;
     try { vin = gerarVin(); } catch (err) {
       return interaction.editReply({ content: '❌ Erro ao gerar VIN. Tente novamente.' });
     }
 
-    // Fix 3: usa message.url da mensagem do UnbelievaBoat como comprovante
     setPendente(comprador.id, {
       vin,
       importador_id: interaction.user.id,
@@ -163,16 +170,8 @@ module.exports = {
 
     console.log(`[autorizar_venda] Pendente criado para ${comprador.id} | VIN: ${vin} | Atendente: ${interaction.user.id}`);
 
-    // Bloqueia se não houver cotação registrada no tópico
-    const cotacao = getCotacao(topico.id);
-    if (!cotacao) {
-      return interaction.editReply({
-        content: '❌ Nenhuma cotação registrada neste tópico.\nUse **/cotacao** antes de autorizar a venda.',
-      });
-    }
-
     // Registra comissão vinculada à cotação
-    if (cotacao) {
+    {
       const valorCentavos = normalizarValor(valorPago) || cotacao.valor_centavos;
       const comissaoCentavos = Math.round(valorCentavos * 0.02);
       const fmtValor = `$${(valorCentavos / 100).toLocaleString('pt-BR')}`;

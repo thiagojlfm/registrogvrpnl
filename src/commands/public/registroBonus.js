@@ -104,13 +104,13 @@ module.exports = {
       ativo: true,
     };
 
-    adicionarVeiculo(veiculo);
-    setBonusCooldown(interaction.user.id, tipo);
-
+    // Posta primeiro — só persiste se o send tiver sucesso
     const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
     const msgPublicada = await canal.send(msgRegistroBonus(veiculo));
     const linkRegistro = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgPublicada.id}`;
-    atualizarVeiculo(vin, { link_registro: linkRegistro });
+
+    adicionarVeiculo({ ...veiculo, link_registro: linkRegistro });
+    setBonusCooldown(interaction.user.id, tipo);
 
     await logRegistro(interaction.client, {
       veiculo: { ...veiculo, link_registro: linkRegistro },

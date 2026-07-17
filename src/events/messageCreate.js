@@ -1,7 +1,7 @@
 const { idBotImportacao, idBotEconomia, canalImportacaoId } = require('../config/config');
 const { parsearMensagemImportacao } = require('../utils/parser');
 const { gerarVin } = require('../utils/vinGenerator');
-const { setPendente } = require('../services/database/db');
+const { setPendente, marcarImportProcessado } = require('../services/database/db');
 const { msgImportacaoRegistrada } = require('../utils/formatter');
 const { parsearUrlDiscord } = require('../utils/valorParser');
 
@@ -50,6 +50,7 @@ module.exports = {
       return;
     }
 
+    marcarImportProcessado(message.id);
     setPendente(dados.comprador_id, {
       vin,
       importador_id: dados.importador_id || null,
