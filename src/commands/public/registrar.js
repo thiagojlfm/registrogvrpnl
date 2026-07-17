@@ -102,16 +102,16 @@ module.exports = {
       ativo: true,
     };
 
-    adicionarVeiculo(veiculo);
-    removerPendente(interaction.user.id);
-
+    // Posta primeiro — só persiste se o send tiver sucesso
     const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
     const msgPublicada = await canal.send(msgRegistroOficial(veiculo));
 
     const linkRegistro = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgPublicada.id}`;
-    atualizarVeiculo(pendente.vin, { link_registro: linkRegistro });
+    adicionarVeiculo({ ...veiculo, link_registro: linkRegistro });
+    removerPendente(interaction.user.id);
 
     await logRegistro(interaction.client, {
+
       veiculo,
       registradorId: interaction.user.id,
       linkRegistro,
