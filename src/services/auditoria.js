@@ -1,5 +1,6 @@
 const { MessageFlags } = require('discord.js');
 const { canalAuditoriaId, cores, emojis: e } = require('../config/config');
+const db = require('./database/db');
 
 const { carro, info, infoAlt, sim, vendido, seta, dot, rpc2, rpw, rpc } = e || {};
 
@@ -24,6 +25,16 @@ async function postar(client, payload) {
 // ── Registro novo ─────────────────────────────────────────────────────────────
 
 async function logRegistro(client, { veiculo: v, registradorId, linkRegistro }) {
+  const dadosRecovery = {
+    vin: v.vin, placa: v.placa, cor: v.cor, veiculo: v.veiculo,
+    modelo: v.modelo || '', comprador_id: v.comprador_id, tipo: v.tipo,
+    link_registro: linkRegistro, foto_url: v.foto_url || null,
+    classe: v.classe || null, categoria: v.categoria || null,
+    link_cotacao: v.link_cotacao || null, comprovante: v.comprovante || null,
+    valor_pago: v.valor_pago || null, importador_id: v.importador_id || null,
+    empresa: v.empresa || null, empresa_link: v.empresa_link || null,
+    finalidade: v.finalidade || null,
+  };
   await postar(client, {
     flags: v2(),
     components: [container(cores.verde, [
@@ -51,7 +62,10 @@ async function logRegistro(client, { veiculo: v, registradorId, linkRegistro }) 
         `> ${dot} **Registro oficial:** ${linkRegistro}`
       ),
       sep(),
-      text(`-# Log gerado automaticamente · ${ts()}`),
+      text(
+        `-# Log gerado automaticamente · ${ts()}\n` +
+        `-# 📦 \`VEICULO\` · ${JSON.stringify(dadosRecovery)}`
+      ),
     ])],
   });
 }
@@ -82,7 +96,8 @@ async function logTransferencia(client, { veiculo: v, exProprietarioId, novoProp
         `## ${info} ${seta} Pagamento\n` +
         `> ${dot} **Comprovante:** ${comprovante}\n` +
         (v.link_registro ? `> ${dot} **Registro:** ${v.link_registro}\n` : '') +
-        `-# Log gerado automaticamente · ${ts()}`
+        `-# Log gerado automaticamente · ${ts()}\n` +
+        `-# 📦 \`TRANSFERENCIA\` · ${JSON.stringify({ vin: v.vin, placa: v.placa, ex: exProprietarioId, novo: novoProprietarioId, comprovante })}`
       ),
     ])],
   });
@@ -161,7 +176,8 @@ async function logPendente(client, { comprador_id, pendente }) {
       sep(),
       text(
         `-# 🔒 Aguardando /registrar_veiculo · ${ts()}\n` +
-        `-# PENDENTE_JSON:\`${JSON.stringify({ comprador_id, ...pendente })}\``
+        `-# PENDENTE_JSON:\`${JSON.stringify({ comprador_id, ...pendente })}\`\n` +
+        `-# 📦 \`PENDENTE\` · ${JSON.stringify({ comprador_id, ...pendente })}`
       ),
     ])],
   });
@@ -265,4 +281,108 @@ async function logApagouRegistro(client, { veiculo: v }) {
   }
 }
 
-module.exports = { logRegistro, logTransferencia, logEdicaoFoto, logDeploy, logPendente, logApagouRegistro, logCotacao, logComissao };
+// ── Recovery: reconstrói estado a partir do canal de auditoria ────────────────
+// Chamado no startup se veiculos.json estiver vazio — Discord como fonte de verdade.
+
+function _extrairTexto(components = []) {
+  let out = '';
+  for (const c of components) {
+    if (c.type === 10 && c.content) out += c.content + '\n';
+    if (c.components) out += _extrairTexto(c.components);
+  }
+  return out;
+}
+
+function _parseDataLine(texto) {
+  // Formato: -# 📦 `TYPE` · {json}
+  const match = texto.match(/-# 📦 `([A-Z_]+)` · (\{[\s\S]+?\})(?:\n|$)/m);
+  if (!match) return null;
+  try { return { tipo: match[1], dados: JSON.parse(match[2]) }; } catch { return null; }
+}
+
+async function reconstruirDoCanal(client) {
+  if (!canalAuditoriaId) {
+    console.warn('[recovery] CANAL_AUDITORIA_ID não configurado — recovery impossível.');
+    return { veiculos: 0, pendentes: 0 };
+  }
+
+  console.log('[recovery] DB vazio — reconstruindo do canal de auditoria...');
+
+  try {
+    const canal = await client.channels.fetch(canalAuditoriaId);
+    const todasMsgs = [];
+    let before;
+
+    while (true) {
+      const batch = await canal.messages.fetch({ limit: 100, ...(before && { before }) });
+      if (!batch.size) break;
+      todasMsgs.push(...batch.values());
+      before = batch.last().id;
+      if (batch.size < 100) break;
+    }
+
+    // Mais antigas primeiro
+    todasMsgs.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+    const veiculosMap = new Map();   // vin → objeto
+    const pendentesMap = {};         // comprador_id → pendente
+    const vinsRegistrados = new Set();
+
+    for (const msg of todasMsgs) {
+      if (msg.author.id !== client.user.id) continue;
+      const texto = _extrairTexto(msg.components || []);
+      const parsed = _parseDataLine(texto);
+      if (!parsed) continue;
+
+      const { tipo, dados } = parsed;
+
+      if (tipo === 'VEICULO') {
+        const veiculo = {
+          ...dados,
+          ativo: true,
+          historico_proprietarios: dados.historico_proprietarios || [{ id: dados.comprador_id, desde: msg.createdTimestamp }],
+          data_registro: dados.data_registro || msg.createdTimestamp,
+        };
+        veiculosMap.set(dados.vin, veiculo);
+        vinsRegistrados.add(dados.vin);
+      }
+
+      if (tipo === 'TRANSFERENCIA' && veiculosMap.has(dados.vin)) {
+        const v = veiculosMap.get(dados.vin);
+        v.comprador_id = dados.novo;
+        v.historico_proprietarios = [
+          ...(v.historico_proprietarios || []),
+          { id: dados.novo, desde: msg.createdTimestamp },
+        ];
+      }
+
+      if (tipo === 'PENDENTE' && dados.comprador_id) {
+        if (!vinsRegistrados.has(dados.vin)) {
+          const { comprador_id, ...resto } = dados;
+          pendentesMap[comprador_id] = resto;
+        }
+      }
+    }
+
+    // Grava no banco
+    let veiculosSalvos = 0;
+    for (const veiculo of veiculosMap.values()) {
+      await db.adicionarVeiculo(veiculo);
+      veiculosSalvos++;
+    }
+
+    let pendentesSalvos = 0;
+    for (const [comprador_id, pendente] of Object.entries(pendentesMap)) {
+      await db.setPendente(comprador_id, pendente);
+      pendentesSalvos++;
+    }
+
+    console.log(`[recovery] Reconstruído: ${veiculosSalvos} veículo(s), ${pendentesSalvos} pendente(s).`);
+    return { veiculos: veiculosSalvos, pendentes: pendentesSalvos };
+  } catch (err) {
+    console.error('[recovery] Falha ao reconstruir do canal:', err.message);
+    return { veiculos: 0, pendentes: 0 };
+  }
+}
+
+module.exports = { logRegistro, logTransferencia, logEdicaoFoto, logDeploy, logPendente, logApagouRegistro, logCotacao, logComissao, reconstruirDoCanal };
