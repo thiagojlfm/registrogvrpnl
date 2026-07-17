@@ -236,6 +236,29 @@ module.exports = {
         }
       }
 
+      // 4. Limpa canal de integração 911
+      const canal911Id = process.env.CANAL_INTEGRACAO_911_ID;
+      if (canal911Id) {
+        try {
+          const canal911 = await interaction.client.channels.fetch(canal911Id);
+          let apagadas = 0;
+          while (true) {
+            const msgs = await canal911.messages.fetch({ limit: 100 });
+            if (msgs.size === 0) break;
+            const proprias = msgs.filter(m => m.author.id === interaction.client.user.id);
+            if (proprias.size === 0) break;
+            for (const m of proprias.values()) {
+              await m.delete().catch(() => {});
+              apagadas++;
+            }
+            if (msgs.size < 100) break;
+          }
+          etapas.push(`✅ Canal 911 limpo (${apagadas} mensagens apagadas)`);
+        } catch (e) {
+          etapas.push(`⚠️ Canal 911: ${e.message}`);
+        }
+      }
+
       return interaction.editReply({ content: `## 🧹 Reset concluído\n${etapas.join('\n')}` });
     }
 
@@ -261,6 +284,7 @@ module.exports = {
           vin: v.vin,
           modelo: `${v.veiculo} ${v.modelo || ''}`.trim(),
           cor: v.cor,
+          link_registro: v.link_registro || null,
         });
         ok++;
         await new Promise(r => setTimeout(r, 500));

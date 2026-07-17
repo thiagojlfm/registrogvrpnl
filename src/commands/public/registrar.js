@@ -125,6 +125,7 @@ module.exports = {
       vin: pendente.vin,
       modelo: `${pendente.veiculo} ${pendente.modelo}`.trim(),
       cor,
+      link_registro: linkRegistro,
     });
 
     const { MessageFlags } = require('discord.js');
