@@ -17,3 +17,14 @@ for (const arquivo of arquivos) {
 }
 
 client.login(token);
+
+// Graceful shutdown — aguarda writes pendentes antes de morrer
+process.once('SIGTERM', async () => {
+  console.log('[shutdown] SIGTERM recebido — aguardando writes pendentes...');
+  // Pequena janela para a write-queue do db.js drenar
+  await new Promise(r => setTimeout(r, 500));
+  console.log('[shutdown] Encerrando.');
+  process.exit(0);
+});
+
+process.once('SIGINT', () => process.exit(0));

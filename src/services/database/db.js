@@ -2,6 +2,38 @@ const fs = require('fs');
 const path = require('path');
 const { dbPath } = require('../../config/config');
 
+// Write atômico: grava em .tmp e renomeia — evita JSON corrompido se processo morrer no meio
+function atomicWrite(filePath, data) {
+  const tmp = filePath + '.tmp';
+  fs.writeFileSync(tmp, data, 'utf8');
+  fs.renameSync(tmp, filePath);
+}
+
+// Leitura segura com fallback — nunca deixa o bot não subir por JSON corrompido
+function safeRead(filePath, fallback) {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    console.error(`[db] JSON corrompido em ${path.basename(filePath)} — restaurando fallback`);
+    const backup = filePath + '.bak';
+    if (fs.existsSync(backup)) {
+      try { return JSON.parse(fs.readFileSync(backup, 'utf8')); } catch {}
+    }
+    return fallback;
+  }
+}
+
+// Grava e mantém backup da versão anterior
+function safeWrite(filePath, data) {
+  const serialized = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  // Backup da versão atual antes de sobrescrever
+  if (fs.existsSync(filePath)) {
+    try { fs.copyFileSync(filePath, filePath + '.bak'); } catch {}
+  }
+  atomicWrite(filePath, serialized);
+}
+
 const veiculosPath       = path.join(dbPath, 'veiculos.json');
 const pendentesPath      = path.join(dbPath, 'pendentes.json');
 const pagamentosPath     = path.join(dbPath, 'pagamentos_pendentes.json');
@@ -38,15 +70,15 @@ ensureFiles();
 // ── Imports processados ───────────────────────────────────────────────────────
 
 function lerImportsProcessados() {
-  return new Set(JSON.parse(fs.readFileSync(importsPath, 'utf8')));
+  return new Set(safeRead(importsPath, []));
 }
 
 function marcarImportProcessado(messageId) {
   return withLock(importsPath, () => {
-    const ids = JSON.parse(fs.readFileSync(importsPath, 'utf8'));
+    const ids = safeRead(importsPath, []);
     if (!ids.includes(messageId)) {
       ids.push(messageId);
-      fs.writeFileSync(importsPath, JSON.stringify(ids));
+      safeWrite(importsPath, ids);
     }
   });
 }
@@ -54,11 +86,11 @@ function marcarImportProcessado(messageId) {
 // ── Veículos ──────────────────────────────────────────────────────────────────
 
 function lerVeiculos() {
-  return JSON.parse(fs.readFileSync(veiculosPath, 'utf8'));
+  return safeRead(veiculosPath, []);
 }
 
 function salvarVeiculos(veiculos) {
-  fs.writeFileSync(veiculosPath, JSON.stringify(veiculos, null, 2));
+  safeWrite(veiculosPath, veiculos);
 }
 
 function buscarVeiculoPorPlaca(placa) {
@@ -117,11 +149,11 @@ function substituirVeiculoBonus(discordId, tipo, novoVeiculo) {
 // ── Pendentes ─────────────────────────────────────────────────────────────────
 
 function lerPendentes() {
-  return JSON.parse(fs.readFileSync(pendentesPath, 'utf8'));
+  return safeRead(pendentesPath, {});
 }
 
 function salvarPendentes(pendentes) {
-  fs.writeFileSync(pendentesPath, JSON.stringify(pendentes, null, 2));
+  safeWrite(pendentesPath, pendentes);
 }
 
 function getPendente(discordId) {
@@ -147,11 +179,11 @@ function removerPendente(discordId) {
 // ── Pagamentos pendentes ──────────────────────────────────────────────────────
 
 function lerPagamentos() {
-  return JSON.parse(fs.readFileSync(pagamentosPath, 'utf8'));
+  return safeRead(pagamentosPath, []);
 }
 
 function salvarPagamentos(pagamentos) {
-  fs.writeFileSync(pagamentosPath, JSON.stringify(pagamentos, null, 2));
+  safeWrite(pagamentosPath, pagamentos);
 }
 
 function adicionarPagamento(dados) {
@@ -191,7 +223,7 @@ function limparPagamentosExpirados() {
 // ── Veículo Bônus cooldowns ───────────────────────────────────────────────────
 
 function lerBonusCooldowns() {
-  return JSON.parse(fs.readFileSync(bonusCooldownsPath, 'utf8'));
+  return safeRead(bonusCooldownsPath, {});
 }
 
 function getBonusCooldown(discordId, tipo) {
@@ -202,7 +234,7 @@ function setBonusCooldown(discordId, tipo) {
   return withLock(bonusCooldownsPath, () => {
     const cooldowns = lerBonusCooldowns();
     cooldowns[`${discordId}:${tipo}`] = Date.now();
-    fs.writeFileSync(bonusCooldownsPath, JSON.stringify(cooldowns, null, 2));
+    safeWrite(bonusCooldownsPath, cooldowns);
   });
 }
 
@@ -216,11 +248,11 @@ function podeTrocarBonus(discordId, tipo) {
 // ── Cotações ──────────────────────────────────────────────────────────────────
 
 function lerCotacoes() {
-  return JSON.parse(fs.readFileSync(cotacoesPath, 'utf8'));
+  return safeRead(cotacoesPath, {});
 }
 
 function salvarCotacoes(cotacoes) {
-  fs.writeFileSync(cotacoesPath, JSON.stringify(cotacoes, null, 2));
+  safeWrite(cotacoesPath, cotacoes);
 }
 
 function setCotacao(topicoId, dados) {
@@ -250,11 +282,11 @@ function removerCotacaoPorMensagem(messageId) {
 // ── Comissões ─────────────────────────────────────────────────────────────────
 
 function lerComissoes() {
-  return JSON.parse(fs.readFileSync(comissoesPath, 'utf8'));
+  return safeRead(comissoesPath, []);
 }
 
 function salvarComissoes(comissoes) {
-  fs.writeFileSync(comissoesPath, JSON.stringify(comissoes, null, 2));
+  safeWrite(comissoesPath, comissoes);
 }
 
 function registrarComissao(dados) {
