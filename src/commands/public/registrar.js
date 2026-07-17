@@ -107,8 +107,8 @@ module.exports = {
     const msgPublicada = await canal.send(msgRegistroOficial(veiculo));
 
     const linkRegistro = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgPublicada.id}`;
-    adicionarVeiculo({ ...veiculo, link_registro: linkRegistro });
-    removerPendente(interaction.user.id);
+    await adicionarVeiculo({ ...veiculo, link_registro: linkRegistro });
+    await removerPendente(interaction.user.id);
 
     await logRegistro(interaction.client, {
 

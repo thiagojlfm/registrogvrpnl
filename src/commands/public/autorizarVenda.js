@@ -7,6 +7,9 @@ const { logPendente, logComissao } = require('../../services/auditoria');
 
 const DOIS_HORAS_MS = 2 * 60 * 60 * 1000;
 
+// Mutex por tópico — impede dupla autorização simultânea
+const autorizacoesEmAndamento = new Set();
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('autorizar_venda')
@@ -16,7 +19,7 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    // Verificação de cargo — ephemeral, só o atendente vê
+    // Verificação de cargo — ephemeral, sem defer ainda
     if (cargoAtendente && !interaction.member.roles.cache.has(cargoAtendente)) {
       return interaction.reply({ content: '❌ Você não tem permissão para autorizar vendas.', flags: MessageFlags.Ephemeral });
     }
@@ -27,7 +30,27 @@ module.exports = {
       return interaction.reply({ content: '❌ Não foi possível acessar o canal/tópico atual.', flags: MessageFlags.Ephemeral });
     }
 
-    // Busca histórico ANTES de deferir para poder responder ephemeral se necessário
+    // Mutex: impede dupla autorização simultânea no mesmo tópico
+    if (autorizacoesEmAndamento.has(topico.id)) {
+      return interaction.reply({ content: '⏳ Já há uma autorização em andamento neste tópico. Aguarde.', flags: MessageFlags.Ephemeral });
+    }
+    autorizacoesEmAndamento.add(topico.id);
+
+    try {
+      await _executarAutorizacao(interaction, comprador, topico);
+    } finally {
+      autorizacoesEmAndamento.delete(topico.id);
+    }
+  },
+};
+
+async function _executarAutorizacao(interaction, comprador, topico) {
+    // Defer imediato — antes de qualquer await de API
+    await interaction.deferReply();
+
+    const agora = Date.now();
+
+    // Busca histórico após defer
     let msgCotacao = null;
     let todasMensagens = [];
     try {
@@ -39,12 +62,10 @@ module.exports = {
       todasMensagens = [...colecao.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
     } catch (err) {
       console.error('[autorizar_venda] Erro ao buscar histórico:', err.message);
-      return interaction.reply({ content: '❌ Não foi possível ler o histórico do tópico.', flags: MessageFlags.Ephemeral });
+      return interaction.editReply({ content: '❌ Não foi possível ler o histórico do tópico.' });
     }
 
-    const agora = Date.now();
-
-    // Trava: só uma VENDA AUTORIZADA por tópico — erro ephemeral (só o atendente vê)
+    // Trava: só uma VENDA AUTORIZADA por tópico
     const msgVendaAutorizada = todasMensagens.find(m => {
       if (m.author.id !== interaction.client.user.id) return false;
       return JSON.stringify(m.components || []).includes('VENDA AUTORIZADA');
@@ -52,22 +73,17 @@ module.exports = {
 
     if (msgVendaAutorizada) {
       const rawTexto = JSON.stringify(msgVendaAutorizada.components || []);
-      // Procura "Comprador: <@id>" no texto serializado
-      const compradorExistente = rawTexto.match(/Comprador[^"]*<@(\d+)>/)?.[1]
-        || rawTexto.match(/<@(\d+)>/)?.[1];
+      const compradorExistente = rawTexto.match(/Comprador[^"]*<@(\d+)>/)?.[1] || null;
+      if (!compradorExistente) {
+        return interaction.editReply({ content: '❌ Formato de autorização existente não reconhecido. Contate a administração.' });
+      }
       if (compradorExistente !== comprador.id) {
-        return interaction.reply({
-          content:
-            `❌ Este tópico já tem uma **VENDA AUTORIZADA** para <@${compradorExistente}>.\n` +
-            `Só pode existir uma autorização por tópico.`,
-          flags: MessageFlags.Ephemeral,
+        return interaction.editReply({
+          content: `❌ Este tópico já tem uma **VENDA AUTORIZADA** para <@${compradorExistente}>.\nSó pode existir uma autorização por tópico.`,
         });
       }
-      // Mesmo comprador → re-autorização: defer público e continua normalmente
+      // Mesmo comprador → re-autorização, continua normalmente
     }
-
-    // A partir daqui a resposta é pública (visível a todos no tópico)
-    await interaction.deferReply();
 
     // Foca no !pay: busca o !pay mais recente nas mensagens do tópico (últimas 2h)
     const msgPayCmd = [...todasMensagens].reverse().find(m => {
@@ -176,7 +192,7 @@ module.exports = {
       const comissaoCentavos = Math.round(valorCentavos * 0.02);
       const fmtValor = `$${(valorCentavos / 100).toLocaleString('pt-BR')}`;
       const fmtComissao = `$${(comissaoCentavos / 100).toLocaleString('pt-BR')}`;
-      const num = registrarComissao({
+      const num = await registrarComissao({
         vin,
         carro: `${veiculoNome}${modeloNome ? ` ${modeloNome}` : ''}`,
         atendente_id: interaction.user.id,

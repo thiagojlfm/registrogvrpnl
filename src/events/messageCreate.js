@@ -50,7 +50,6 @@ module.exports = {
       return;
     }
 
-    marcarImportProcessado(message.id);
     setPendente(dados.comprador_id, {
       vin,
       importador_id: dados.importador_id || null,
@@ -62,6 +61,7 @@ module.exports = {
       criado_em: Date.now(),
     });
 
+    await marcarImportProcessado(message.id);
     console.log(`[importacao] Pendente criado para ${dados.comprador_id} | VIN: ${vin}`);
 
     // Notifica no tópico da conce onde o !pay foi feito

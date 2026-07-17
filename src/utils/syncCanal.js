@@ -1,5 +1,5 @@
 const { canalRegistroVeicularId, canalAuditoriaId } = require('../config/config');
-const { lerVeiculos, salvarVeiculos, atualizarVeiculo, lerPendentes, salvarPendentes } = require('../services/database/db');
+const { lerVeiculos, atualizarVeiculo, removerVeiculo, lerPendentes, salvarPendentes } = require('../services/database/db');
 const { msgRegistroOficial } = require('./formatter');
 
 function extrairTexto(components = []) {
@@ -172,7 +172,7 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
       ];
       vDb.comprador_id = t.novoProprietarioId;
       vDb.historico_proprietarios = historico;
-      atualizarVeiculo(vin, { comprador_id: t.novoProprietarioId, historico_proprietarios: historico });
+      await atualizarVeiculo(vin, { comprador_id: t.novoProprietarioId, historico_proprietarios: historico });
       atualizados++;
     }
   }
@@ -210,11 +210,16 @@ async function sincronizarCanal(client, { reconciliar = false } = {}) {
     }
   }
 
-  if (novos > 0 || removidos > 0) {
-    salvarVeiculos(lista);
-    if (novos > 0)     console.log(`[sync] ${novos} veículo(s) importado(s) do canal.`);
-    if (removidos > 0) console.log(`[sync] ${removidos} veículo(s) removido(s) (registro apagado do canal).`);
+  if (removidos > 0) {
+    // Remove individualmente via lock — nunca sobrescreve o banco inteiro com snapshot antigo
+    const vinsRemovidos = lista.filter(v => v.ativo).map(v => v.vin)
+      .filter(vin => !vinsNoCanal.has(vin));
+    for (const vin of vinsRemovidos) {
+      await removerVeiculo(vin);
+    }
+    console.log(`[sync] ${removidos} veículo(s) removido(s) (registro apagado do canal).`);
   }
+  if (novos > 0) console.log(`[sync] ${novos} veículo(s) importado(s) do canal.`);
 
   return { novos, removidos };
 }

@@ -6,7 +6,7 @@ module.exports = {
   name: 'messageDelete',
   async execute(message) {
     // Cotação apagada → remove do JSON + apaga log na auditoria
-    const cotacao = removerCotacaoPorMensagem(message.id);
+    const cotacao = await removerCotacaoPorMensagem(message.id);
     if (cotacao?.auditoria_message_id && canalAuditoriaId) {
       try {
         const canal = await message.client.channels.fetch(canalAuditoriaId);

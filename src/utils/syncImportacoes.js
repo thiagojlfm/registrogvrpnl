@@ -62,8 +62,7 @@ async function sincronizarImportacoes(client) {
 
       // Tudo ok — gera VIN, salva pendente e marca import como processado
       const vin = gerarVin();
-      marcarImportProcessado(msg.id);
-      setPendente(dados.comprador_id, {
+      await setPendente(dados.comprador_id, {
         vin,
         importador_id: dados.importador_id || null,
         veiculo:      dados.veiculo  || 'Desconhecido',
@@ -73,6 +72,7 @@ async function sincronizarImportacoes(client) {
         valor_pago:   dados.valor_pago || null,
         criado_em:    msg.createdTimestamp,
       });
+      await marcarImportProcessado(msg.id);
 
       compradoresAtivos.add(dados.comprador_id);
       gerados++;

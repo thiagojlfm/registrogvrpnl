@@ -115,13 +115,13 @@ module.exports = {
         ativo: true,
       };
 
-      adicionarVeiculo(veiculo);
-      removerPendente(usuario.id);
+      await adicionarVeiculo(veiculo);
+      await removerPendente(usuario.id);
 
       const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
       const msgPublicada = await canal.send(msgRegistroOficial(veiculo));
       const link = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgPublicada.id}`;
-      atualizarVeiculo(pendente.vin, { link_registro: link });
+      await atualizarVeiculo(pendente.vin, { link_registro: link });
 
       return interaction.editReply({ content: `✅ Veículo registrado para <@${usuario.id}>.\n🔗 ${link}` });
     }
@@ -140,7 +140,7 @@ module.exports = {
         return interaction.editReply({ content: '❌ Veículo não encontrado.' });
       }
 
-      removerVeiculo(veiculo.vin);
+      await removerVeiculo(veiculo.vin);
       return interaction.editReply({ content: `✅ Veículo **${veiculo.placa}** (VIN: ${veiculo.vin}) marcado como inativo.` });
     }
 
@@ -155,7 +155,7 @@ module.exports = {
       }
 
       const historico = [...veiculo.historico_proprietarios, { id: novoProprietario.id, desde: Date.now() }];
-      atualizarVeiculo(veiculo.vin, { comprador_id: novoProprietario.id, historico_proprietarios: historico });
+      await atualizarVeiculo(veiculo.vin, { comprador_id: novoProprietario.id, historico_proprietarios: historico });
 
       return interaction.editReply({
         content: `✅ Veículo **${placa}** transferido para <@${novoProprietario.id}> (força admin).`,
@@ -169,7 +169,7 @@ module.exports = {
       if (!pendente) {
         return interaction.editReply({ content: `❌ Nenhum pendente encontrado para <@${usuario.id}>.` });
       }
-      removerPendente(usuario.id);
+      await removerPendente(usuario.id);
       return interaction.editReply({ content: `✅ Pendente de <@${usuario.id}> removido (VIN: ${pendente.vin}).` });
     }
 

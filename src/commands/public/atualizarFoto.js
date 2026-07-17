@@ -46,7 +46,7 @@ module.exports = {
     const fotoAntiga = veiculo.foto_url;
 
     // Atualiza foto no banco
-    atualizarVeiculo(veiculo.vin, { foto_url: novaFoto.url });
+    await atualizarVeiculo(veiculo.vin, { foto_url: novaFoto.url });
 
     // Publica novo registro com foto atualizada
     const veiculoAtualizado = { ...veiculo, foto_url: novaFoto.url };
@@ -54,7 +54,7 @@ module.exports = {
     const msgNova = await canal.send(msgRegistroOficial(veiculoAtualizado));
 
     const linkNovo = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgNova.id}`;
-    atualizarVeiculo(veiculo.vin, { link_registro: linkNovo });
+    await atualizarVeiculo(veiculo.vin, { link_registro: linkNovo });
 
     await logEdicaoFoto(interaction.client, {
       veiculo,

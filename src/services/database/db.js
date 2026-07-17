@@ -2,179 +2,208 @@ const fs = require('fs');
 const path = require('path');
 const { dbPath } = require('../../config/config');
 
-const veiculosPath  = path.join(dbPath, 'veiculos.json');
-const pendentesPath = path.join(dbPath, 'pendentes.json');
-const pagamentosPath = path.join(dbPath, 'pagamentos_pendentes.json');
-const importsPath   = path.join(dbPath, 'imports_processados.json');
-const cotacoesPath   = path.join(dbPath, 'cotacoes.json');
-const comissoesPath  = path.join(dbPath, 'comissoes.json');
+const veiculosPath       = path.join(dbPath, 'veiculos.json');
+const pendentesPath      = path.join(dbPath, 'pendentes.json');
+const pagamentosPath     = path.join(dbPath, 'pagamentos_pendentes.json');
+const importsPath        = path.join(dbPath, 'imports_processados.json');
+const cotacoesPath       = path.join(dbPath, 'cotacoes.json');
+const comissoesPath      = path.join(dbPath, 'comissoes.json');
 const bonusCooldownsPath = path.join(dbPath, 'bonus_cooldowns.json');
 
-const EXPIRY_MS = 30 * 60 * 1000; // 30 minutos
+const EXPIRY_MS   = 30 * 60 * 1000;
+const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+
+// ── Write-queue por arquivo (evita race conditions em writes concorrentes) ──────
+const _queues = {};
+function withLock(filePath, fn) {
+  const prev = _queues[filePath] || Promise.resolve();
+  const next = prev.then(fn).catch(err => { throw err; });
+  _queues[filePath] = next.catch(() => {});
+  return next;
+}
 
 function ensureFiles() {
   if (!fs.existsSync(dbPath)) fs.mkdirSync(dbPath, { recursive: true });
-  if (!fs.existsSync(veiculosPath))  fs.writeFileSync(veiculosPath, '[]');
-  if (!fs.existsSync(pendentesPath)) fs.writeFileSync(pendentesPath, '{}');
-  if (!fs.existsSync(pagamentosPath)) fs.writeFileSync(pagamentosPath, '[]');
-  if (!fs.existsSync(importsPath))   fs.writeFileSync(importsPath, '[]');
+  if (!fs.existsSync(veiculosPath))       fs.writeFileSync(veiculosPath, '[]');
+  if (!fs.existsSync(pendentesPath))      fs.writeFileSync(pendentesPath, '{}');
+  if (!fs.existsSync(pagamentosPath))     fs.writeFileSync(pagamentosPath, '[]');
+  if (!fs.existsSync(importsPath))        fs.writeFileSync(importsPath, '[]');
   if (!fs.existsSync(cotacoesPath))       fs.writeFileSync(cotacoesPath, '{}');
   if (!fs.existsSync(comissoesPath))      fs.writeFileSync(comissoesPath, '[]');
   if (!fs.existsSync(bonusCooldownsPath)) fs.writeFileSync(bonusCooldownsPath, '{}');
 }
 
+ensureFiles();
+
+// ── Imports processados ───────────────────────────────────────────────────────
+
 function lerImportsProcessados() {
-  ensureFiles();
   return new Set(JSON.parse(fs.readFileSync(importsPath, 'utf8')));
 }
 
 function marcarImportProcessado(messageId) {
-  ensureFiles();
-  const ids = JSON.parse(fs.readFileSync(importsPath, 'utf8'));
-  if (!ids.includes(messageId)) {
-    ids.push(messageId);
-    fs.writeFileSync(importsPath, JSON.stringify(ids));
-  }
+  return withLock(importsPath, () => {
+    const ids = JSON.parse(fs.readFileSync(importsPath, 'utf8'));
+    if (!ids.includes(messageId)) {
+      ids.push(messageId);
+      fs.writeFileSync(importsPath, JSON.stringify(ids));
+    }
+  });
 }
 
+// ── Veículos ──────────────────────────────────────────────────────────────────
+
 function lerVeiculos() {
-  ensureFiles();
   return JSON.parse(fs.readFileSync(veiculosPath, 'utf8'));
 }
 
 function salvarVeiculos(veiculos) {
-  ensureFiles();
   fs.writeFileSync(veiculosPath, JSON.stringify(veiculos, null, 2));
 }
 
+function buscarVeiculoPorPlaca(placa) {
+  return lerVeiculos().find(v => v.placa.toLowerCase() === placa.toLowerCase() && v.ativo) || null;
+}
+
+function buscarVeiculosPorProprietario(discordId) {
+  return lerVeiculos().filter(v => v.comprador_id === discordId && v.ativo);
+}
+
+function buscarVeiculoPorVin(vin) {
+  return lerVeiculos().find(v => v.vin === vin) || null;
+}
+
+function adicionarVeiculo(veiculo) {
+  return withLock(veiculosPath, () => {
+    const lista = lerVeiculos();
+    lista.push(veiculo);
+    salvarVeiculos(lista);
+  });
+}
+
+function atualizarVeiculo(vin, dados) {
+  return withLock(veiculosPath, () => {
+    const lista = lerVeiculos();
+    const idx = lista.findIndex(v => v.vin === vin);
+    if (idx === -1) return false;
+    lista[idx] = { ...lista[idx], ...dados };
+    salvarVeiculos(lista);
+    return true;
+  });
+}
+
+function removerVeiculo(vin) {
+  return withLock(veiculosPath, () => {
+    const lista = lerVeiculos();
+    const idx = lista.findIndex(v => v.vin === vin);
+    if (idx === -1) return false;
+    lista[idx].ativo = false;
+    salvarVeiculos(lista);
+    return true;
+  });
+}
+
+// Operação atômica: desativa anterior e adiciona novo em único write
+function substituirVeiculoBonus(discordId, tipo, novoVeiculo) {
+  return withLock(veiculosPath, () => {
+    const lista = lerVeiculos();
+    const idx = lista.findIndex(v => v.ativo && v.comprador_id === discordId && v.tipo_bonus === tipo);
+    if (idx !== -1) lista[idx].ativo = false;
+    lista.push(novoVeiculo);
+    salvarVeiculos(lista);
+  });
+}
+
+// ── Pendentes ─────────────────────────────────────────────────────────────────
+
 function lerPendentes() {
-  ensureFiles();
   return JSON.parse(fs.readFileSync(pendentesPath, 'utf8'));
 }
 
 function salvarPendentes(pendentes) {
-  ensureFiles();
   fs.writeFileSync(pendentesPath, JSON.stringify(pendentes, null, 2));
 }
 
-function buscarVeiculoPorPlaca(placa) {
-  const veiculos = lerVeiculos();
-  return veiculos.find(v => v.placa.toLowerCase() === placa.toLowerCase() && v.ativo) || null;
-}
-
-function buscarVeiculosPorProprietario(discordId) {
-  const veiculos = lerVeiculos();
-  return veiculos.filter(v => v.comprador_id === discordId && v.ativo);
-}
-
-function buscarVeiculoPorVin(vin) {
-  const veiculos = lerVeiculos();
-  return veiculos.find(v => v.vin === vin) || null;
-}
-
-function adicionarVeiculo(veiculo) {
-  const veiculos = lerVeiculos();
-  veiculos.push(veiculo);
-  salvarVeiculos(veiculos);
-}
-
-function atualizarVeiculo(vin, dados) {
-  const veiculos = lerVeiculos();
-  const idx = veiculos.findIndex(v => v.vin === vin);
-  if (idx === -1) return false;
-  veiculos[idx] = { ...veiculos[idx], ...dados };
-  salvarVeiculos(veiculos);
-  return true;
-}
-
-function removerVeiculo(vin) {
-  const veiculos = lerVeiculos();
-  const idx = veiculos.findIndex(v => v.vin === vin);
-  if (idx === -1) return false;
-  veiculos[idx].ativo = false;
-  salvarVeiculos(veiculos);
-  return true;
-}
-
 function getPendente(discordId) {
-  const pendentes = lerPendentes();
-  return pendentes[discordId] || null;
+  return lerPendentes()[discordId] || null;
 }
 
 function setPendente(discordId, dados) {
-  const pendentes = lerPendentes();
-  pendentes[discordId] = dados;
-  salvarPendentes(pendentes);
+  return withLock(pendentesPath, () => {
+    const pendentes = lerPendentes();
+    pendentes[discordId] = dados;
+    salvarPendentes(pendentes);
+  });
 }
 
 function removerPendente(discordId) {
-  const pendentes = lerPendentes();
-  delete pendentes[discordId];
-  salvarPendentes(pendentes);
+  return withLock(pendentesPath, () => {
+    const pendentes = lerPendentes();
+    delete pendentes[discordId];
+    salvarPendentes(pendentes);
+  });
 }
 
-// ── Pagamentos pendentes (fluxo conce direto) ────────────────────────────────
+// ── Pagamentos pendentes ──────────────────────────────────────────────────────
 
 function lerPagamentos() {
-  ensureFiles();
   return JSON.parse(fs.readFileSync(pagamentosPath, 'utf8'));
 }
 
 function salvarPagamentos(pagamentos) {
-  ensureFiles();
   fs.writeFileSync(pagamentosPath, JSON.stringify(pagamentos, null, 2));
 }
 
 function adicionarPagamento(dados) {
-  const pagamentos = lerPagamentos();
-  // Remove pagamento anterior não usado do mesmo payer (sobrescreve)
-  const filtrado = pagamentos.filter(p => p.payer_id !== dados.payer_id);
-  filtrado.push(dados);
-  salvarPagamentos(filtrado);
+  return withLock(pagamentosPath, () => {
+    const pagamentos = lerPagamentos();
+    const filtrado = pagamentos.filter(p => p.payer_id !== dados.payer_id);
+    filtrado.push(dados);
+    salvarPagamentos(filtrado);
+  });
 }
 
 function getPagamentoPendente(payerId) {
-  const pagamentos = lerPagamentos();
   const agora = Date.now();
-  return pagamentos.find(
+  return lerPagamentos().find(
     p => p.payer_id === payerId && !p.usado && (agora - p.timestamp) < EXPIRY_MS
   ) || null;
 }
 
 function marcarPagamentoUsado(payerId) {
-  const pagamentos = lerPagamentos();
-  const idx = pagamentos.findIndex(p => p.payer_id === payerId && !p.usado);
-  if (idx === -1) return false;
-  pagamentos[idx].usado = true;
-  salvarPagamentos(pagamentos);
-  return true;
+  return withLock(pagamentosPath, () => {
+    const pagamentos = lerPagamentos();
+    const idx = pagamentos.findIndex(p => p.payer_id === payerId && !p.usado);
+    if (idx === -1) return false;
+    pagamentos[idx].usado = true;
+    salvarPagamentos(pagamentos);
+    return true;
+  });
 }
 
 function limparPagamentosExpirados() {
-  const pagamentos = lerPagamentos();
-  const agora = Date.now();
-  const ativos = pagamentos.filter(p => !p.usado && (agora - p.timestamp) < EXPIRY_MS);
-  salvarPagamentos(ativos);
+  return withLock(pagamentosPath, () => {
+    const agora = Date.now();
+    salvarPagamentos(lerPagamentos().filter(p => !p.usado && (agora - p.timestamp) < EXPIRY_MS));
+  });
 }
 
-// ── Veículo Bônus (Staff / Boost) cooldowns ──────────────────────────────────
-
-const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+// ── Veículo Bônus cooldowns ───────────────────────────────────────────────────
 
 function lerBonusCooldowns() {
-  ensureFiles();
   return JSON.parse(fs.readFileSync(bonusCooldownsPath, 'utf8'));
 }
 
 function getBonusCooldown(discordId, tipo) {
-  const cooldowns = lerBonusCooldowns();
-  return cooldowns[`${discordId}:${tipo}`] || null;
+  return lerBonusCooldowns()[`${discordId}:${tipo}`] || null;
 }
 
 function setBonusCooldown(discordId, tipo) {
-  const cooldowns = lerBonusCooldowns();
-  cooldowns[`${discordId}:${tipo}`] = Date.now();
-  fs.writeFileSync(bonusCooldownsPath, JSON.stringify(cooldowns, null, 2));
+  return withLock(bonusCooldownsPath, () => {
+    const cooldowns = lerBonusCooldowns();
+    cooldowns[`${discordId}:${tipo}`] = Date.now();
+    fs.writeFileSync(bonusCooldownsPath, JSON.stringify(cooldowns, null, 2));
+  });
 }
 
 function podeTrocarBonus(discordId, tipo) {
@@ -187,54 +216,55 @@ function podeTrocarBonus(discordId, tipo) {
 // ── Cotações ──────────────────────────────────────────────────────────────────
 
 function lerCotacoes() {
-  ensureFiles();
   return JSON.parse(fs.readFileSync(cotacoesPath, 'utf8'));
 }
 
 function salvarCotacoes(cotacoes) {
-  ensureFiles();
   fs.writeFileSync(cotacoesPath, JSON.stringify(cotacoes, null, 2));
 }
 
 function setCotacao(topicoId, dados) {
-  const cotacoes = lerCotacoes();
-  cotacoes[topicoId] = dados;
-  salvarCotacoes(cotacoes);
+  return withLock(cotacoesPath, () => {
+    const cotacoes = lerCotacoes();
+    cotacoes[topicoId] = dados;
+    salvarCotacoes(cotacoes);
+  });
 }
 
 function getCotacao(topicoId) {
-  const cotacoes = lerCotacoes();
-  return cotacoes[topicoId] || null;
+  return lerCotacoes()[topicoId] || null;
 }
 
 function removerCotacaoPorMensagem(messageId) {
-  const cotacoes = lerCotacoes();
-  const topicoId = Object.keys(cotacoes).find(k => cotacoes[k].message_id === messageId);
-  if (!topicoId) return null;
-  const dados = cotacoes[topicoId];
-  delete cotacoes[topicoId];
-  salvarCotacoes(cotacoes);
-  return dados; // retorna dados incluindo auditoria_message_id
+  return withLock(cotacoesPath, () => {
+    const cotacoes = lerCotacoes();
+    const topicoId = Object.keys(cotacoes).find(k => cotacoes[k].message_id === messageId);
+    if (!topicoId) return null;
+    const dados = cotacoes[topicoId];
+    delete cotacoes[topicoId];
+    salvarCotacoes(cotacoes);
+    return dados;
+  });
 }
 
 // ── Comissões ─────────────────────────────────────────────────────────────────
 
 function lerComissoes() {
-  ensureFiles();
   return JSON.parse(fs.readFileSync(comissoesPath, 'utf8'));
 }
 
 function salvarComissoes(comissoes) {
-  ensureFiles();
   fs.writeFileSync(comissoesPath, JSON.stringify(comissoes, null, 2));
 }
 
 function registrarComissao(dados) {
-  const comissoes = lerComissoes();
-  const num = comissoes.length + 1;
-  comissoes.push({ num, ...dados });
-  salvarComissoes(comissoes);
-  return num;
+  return withLock(comissoesPath, () => {
+    const comissoes = lerComissoes();
+    const num = comissoes.length + 1;
+    comissoes.push({ num, ...dados });
+    salvarComissoes(comissoes);
+    return num;
+  });
 }
 
 module.exports = {
@@ -250,6 +280,7 @@ module.exports = {
   adicionarVeiculo,
   atualizarVeiculo,
   removerVeiculo,
+  substituirVeiculoBonus,
   getPendente,
   setPendente,
   removerPendente,

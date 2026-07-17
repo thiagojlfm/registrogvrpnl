@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { canalRegistroVeicularId, cores } = require('../../config/config');
-const { adicionarVeiculo, atualizarVeiculo, lerVeiculos, salvarVeiculos, podeTrocarBonus, setBonusCooldown } = require('../../services/database/db');
+const { substituirVeiculoBonus, podeTrocarBonus, setBonusCooldown } = require('../../services/database/db');
 const { msgRegistroBonus } = require('../../utils/formatter');
 const { gerarVin } = require('../../utils/vinGenerator');
 const { logRegistro } = require('../../services/auditoria');
@@ -63,17 +63,6 @@ module.exports = {
     const cor      = interaction.options.getString('cor');
     const foto     = interaction.options.getAttachment('foto');
 
-    // Desativa veículo bônus anterior do mesmo tipo
-    const veiculos = lerVeiculos();
-    const anterior = veiculos.find(v =>
-      v.ativo && v.comprador_id === interaction.user.id && v.tipo_bonus === tipo
-    );
-    if (anterior) {
-      const idx = veiculos.findIndex(v => v.vin === anterior.vin);
-      veiculos[idx].ativo = false;
-      salvarVeiculos(veiculos);
-    }
-
     const vin = gerarVin();
     const agora = Date.now();
 
@@ -109,8 +98,9 @@ module.exports = {
     const msgPublicada = await canal.send(msgRegistroBonus(veiculo));
     const linkRegistro = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgPublicada.id}`;
 
-    adicionarVeiculo({ ...veiculo, link_registro: linkRegistro });
-    setBonusCooldown(interaction.user.id, tipo);
+    // Operação atômica: desativa anterior + adiciona novo em único write
+    await substituirVeiculoBonus(interaction.user.id, tipo, { ...veiculo, link_registro: linkRegistro });
+    await setBonusCooldown(interaction.user.id, tipo);
 
     await logRegistro(interaction.client, {
       veiculo: { ...veiculo, link_registro: linkRegistro },

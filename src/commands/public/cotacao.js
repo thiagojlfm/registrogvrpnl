@@ -63,7 +63,7 @@ module.exports = {
     const msg = await interaction.editReply(msgPayload);
 
     // Salva cotação (auditoria_message_id adicionado após log)
-    setCotacao(topicoId, {
+    await setCotacao(topicoId, {
       message_id: msg.id,
       atendente_id: interaction.user.id,
       valor_centavos: valorCentavos,
@@ -82,7 +82,7 @@ module.exports = {
     }).catch(() => null);
 
     if (auditoriaId) {
-      setCotacao(topicoId, {
+      await setCotacao(topicoId, {
         message_id: msg.id,
         atendente_id: interaction.user.id,
         valor_centavos: valorCentavos,

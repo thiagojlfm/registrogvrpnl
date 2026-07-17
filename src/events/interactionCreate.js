@@ -53,6 +53,20 @@ async function abrirModalTransferencia(interaction, vin) {
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction) {
+    try {
+      await _handle(interaction);
+    } catch (err) {
+      console.error('[interactionCreate] Erro não capturado:', err);
+      const r = { content: '❌ Erro interno. Tente novamente.', flags: MessageFlags.Ephemeral };
+      try {
+        if (interaction.replied || interaction.deferred) await interaction.followUp(r);
+        else await interaction.reply(r);
+      } catch {}
+    }
+  },
+};
+
+async function _handle(interaction) {
     // ── Slash commands ───────────────────────────────────────────────────────
     if (interaction.isChatInputCommand()) {
       const cmd = comandos.get(interaction.commandName);
@@ -119,7 +133,7 @@ module.exports = {
       const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
       const novaMsg = await canal.send(msgRegistroOficial(veiculo));
       const novoLink = `https://discord.com/channels/${novaMsg.guildId}/${canal.id}/${novaMsg.id}`;
-      atualizarVeiculo(vin, { link_registro: novoLink });
+      await atualizarVeiculo(vin, { link_registro: novoLink });
 
       await interaction.update({
         flags: MessageFlags.IsComponentsV2,
@@ -147,7 +161,7 @@ module.exports = {
     if (interaction.isButton() && interaction.customId.startsWith('btn_apagar_db:')) {
       const vin = interaction.customId.split(':')[1];
       const veiculo = buscarVeiculoPorVin(vin);
-      removerVeiculo(vin);
+      await removerVeiculo(vin);
 
       // Edita a mensagem de auditoria removendo os botões e confirmando
       await interaction.update({
@@ -247,11 +261,10 @@ module.exports = {
       const exProprietarioId = veiculo.comprador_id;
       const historico = [...(veiculo.historico_proprietarios || []), { id: novoId, desde: Date.now() }];
 
-      atualizarVeiculo(vin, {
+      await atualizarVeiculo(vin, {
         comprador_id: novoId,
         historico_proprietarios: historico,
-        comprovante_recompra: comprovante,  // pagamento do dono usado (atualiza a cada transferência)
-        // link_cotacao e comprovante (original) são preservados pelo spread do atualizarVeiculo
+        comprovante_recompra: comprovante,
       });
 
       // Edita a mensagem de registro original para refletir o novo proprietário
@@ -298,5 +311,4 @@ module.exports = {
         comprovante,
       }));
     }
-  },
-};
+}
