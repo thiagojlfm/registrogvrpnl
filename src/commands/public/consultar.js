@@ -1,4 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+// flags: IsComponentsV2 | Ephemeral
+const REPLY_FLAGS = MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral;
 const { buscarVeiculoPorPlaca, buscarVeiculosPorProprietario } = require('../../services/database/db');
 const { msgConsulta } = require('../../utils/formatter');
 
@@ -40,9 +42,7 @@ module.exports = {
       });
     }
 
-    await interaction.reply({
-      ...msgConsulta(veiculos, pessoa?.id),
-      flags: MessageFlags.Ephemeral,
-    });
+    const msg = msgConsulta(veiculos, pessoa?.id);
+    await interaction.reply({ ...msg, flags: REPLY_FLAGS });
   },
 };
