@@ -238,6 +238,14 @@ function setBonusCooldown(discordId, tipo) {
   });
 }
 
+function removerBonusCooldown(discordId, tipo) {
+  return withLock(bonusCooldownsPath, () => {
+    const cooldowns = lerBonusCooldowns();
+    delete cooldowns[`${discordId}:${tipo}`];
+    safeWrite(bonusCooldownsPath, cooldowns);
+  });
+}
+
 function podeTrocarBonus(discordId, tipo) {
   const ts = getBonusCooldown(discordId, tipo);
   if (!ts) return { pode: true, restante: 0 };
@@ -329,5 +337,6 @@ module.exports = {
   registrarComissao,
   getBonusCooldown,
   setBonusCooldown,
+  removerBonusCooldown,
   podeTrocarBonus,
 };

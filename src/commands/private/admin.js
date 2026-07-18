@@ -9,6 +9,8 @@ const {
   adicionarVeiculo,
   salvarVeiculos,
   salvarPendentes,
+  getBonusCooldown,
+  setBonusCooldown,
 } = require('../../services/database/db');
 const fs = require('fs');
 const path = require('path');
@@ -73,6 +75,21 @@ module.exports = {
       sub
         .setName('sync_911')
         .setDescription('Envia todos os veículos ativos ao 911-bot via canal de integração.')
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('reset_bonus')
+        .setDescription('Reseta o cooldown de veículo bônus de um usuário.')
+        .addUserOption(o => o.setName('usuario').setDescription('Usuário').setRequired(true))
+        .addStringOption(o =>
+          o.setName('tipo')
+            .setDescription('Tipo de bônus')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Boost', value: 'boost' },
+              { name: 'Staff', value: 'staff' }
+            )
+        )
     ),
 
   async execute(interaction) {
@@ -260,6 +277,19 @@ module.exports = {
       }
 
       return interaction.editReply({ content: `## 🧹 Reset concluído\n${etapas.join('\n')}` });
+    }
+
+    // ── reset_bonus ──────────────────────────────────────────────────────────
+    if (sub === 'reset_bonus') {
+      const { removerBonusCooldown, getBonusCooldown } = require('../../services/database/db');
+      const usuario = interaction.options.getUser('usuario');
+      const tipo = interaction.options.getString('tipo');
+      const cooldown = getBonusCooldown(usuario.id, tipo);
+      if (!cooldown) {
+        return interaction.editReply({ content: `ℹ️ <@${usuario.id}> não tem cooldown ativo para **${tipo}**.` });
+      }
+      await removerBonusCooldown(usuario.id, tipo);
+      return interaction.editReply({ content: `✅ Cooldown de bônus **${tipo}** resetado para <@${usuario.id}>. Pode usar \`/registro_bonus\` agora.` });
     }
 
     // ── sync_911 ─────────────────────────────────────────────────────────────
