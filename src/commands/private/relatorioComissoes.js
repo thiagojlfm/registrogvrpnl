@@ -74,13 +74,32 @@ module.exports = {
     const buffer = Buffer.from(csv, 'utf8');
     const arquivo = new AttachmentBuilder(buffer, { name: `comissoes_${Date.now()}.csv` });
 
+    const pendentes = lerComissoes().filter(c => !c.pago);
+
     try {
       const dm = await interaction.user.createDM();
       await dm.send({
         content: `📊 **Relatório de Comissões** (${comissoes.length} venda(s) · filtro: ${filtro})`,
         files: [arquivo],
       });
-      await interaction.editReply({ content: '✅ Relatório enviado na sua DM!' });
+
+      const replyBase = `✅ Relatório enviado na sua DM!`;
+      if (pendentes.length === 0) {
+        return interaction.editReply({ content: `${replyBase}\n-# Nenhuma comissão pendente.` });
+      }
+
+      await interaction.editReply({
+        content: `${replyBase}\n> **${pendentes.length}** comissão(ões) pendente(s) de pagamento.`,
+        components: [{
+          type: 1,
+          components: [{
+            type: 2,
+            style: 3,
+            label: `✅ Marcar todas como PAGAS (${pendentes.length})`,
+            custom_id: 'btn_pagar_comissoes',
+          }],
+        }],
+      });
     } catch {
       await interaction.editReply({ content: '❌ Não consegui enviar DM. Verifique se suas DMs estão abertas.' });
     }

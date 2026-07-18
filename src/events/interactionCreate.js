@@ -215,6 +215,17 @@ async function _handle(interaction) {
       return;
     }
 
+    // ── Botão: marcar comissões como pagas ───────────────────────────────────
+    if (interaction.isButton() && interaction.customId === 'btn_pagar_comissoes') {
+      const { marcarComissoesPagas } = require('../services/database/db');
+      const count = await marcarComissoesPagas();
+      await interaction.update({
+        content: `✅ **${count}** comissão(ões) marcada(s) como pagas.\n-# Baixa dada em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} por <@${interaction.user.id}>`,
+        components: [],
+      });
+      return;
+    }
+
     // ── Modal: confirmar transferência ───────────────────────────────────────
     if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_transferir:')) {
       await interaction.deferReply();

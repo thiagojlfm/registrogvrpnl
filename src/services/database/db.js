@@ -307,6 +307,19 @@ function registrarComissao(dados) {
   });
 }
 
+function marcarComissoesPagas() {
+  return withLock(comissoesPath, () => {
+    const comissoes = lerComissoes();
+    const agora = new Date().toISOString();
+    let count = 0;
+    for (const c of comissoes) {
+      if (!c.pago) { c.pago = true; c.data_pagamento = agora; count++; }
+    }
+    salvarComissoes(comissoes);
+    return count;
+  });
+}
+
 module.exports = {
   lerImportsProcessados,
   marcarImportProcessado,
@@ -335,6 +348,7 @@ module.exports = {
   removerCotacaoPorMensagem,
   lerComissoes,
   registrarComissao,
+  marcarComissoesPagas,
   getBonusCooldown,
   setBonusCooldown,
   removerBonusCooldown,
