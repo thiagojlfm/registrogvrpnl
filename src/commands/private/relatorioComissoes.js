@@ -53,7 +53,7 @@ module.exports = {
       }
     }
 
-    const linhas = ['Nº Venda,Data,VIN,Veículo,Atendente,Valor Venda,Comissão (2%),Status'];
+    const linhas = ['Nº Venda,Data,VIN,Veículo,Atendente,Valor Venda,Comissão (5%),Status'];
     for (const c of comissoes) {
       const nome = await getNome(c.atendente_id);
       const data = new Date(c.data).toLocaleDateString('pt-BR');

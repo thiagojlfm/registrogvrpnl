@@ -223,7 +223,7 @@ async function logComissao(client, { num, atendenteId, carro, vin, valorVenda, v
         `> ${dot} **Veículo:** ${carro}\n` +
         `> ${rpc} **VIN:** \`${vin}\`\n` +
         `> ${dot} **Valor da venda:** ${valorVenda}\n` +
-        `> ${dot} **Comissão (2%):** ${valorComissao}\n` +
+        `> ${dot} **Comissão (5%):** ${valorComissao}\n` +
         `-# Log gerado automaticamente · ${ts()}`
       ),
     ])],

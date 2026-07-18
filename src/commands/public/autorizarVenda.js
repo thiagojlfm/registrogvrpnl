@@ -189,7 +189,7 @@ async function _executarAutorizacao(interaction, comprador, topico) {
     // Registra comissão vinculada à cotação
     {
       const valorCentavos = normalizarValor(valorPago) || cotacao.valor_centavos;
-      const comissaoCentavos = Math.round(valorCentavos * 0.02);
+      const comissaoCentavos = Math.round(valorCentavos * 0.05);
       const fmtValor = `$${(valorCentavos / 100).toLocaleString('pt-BR')}`;
       const fmtComissao = `$${(comissaoCentavos / 100).toLocaleString('pt-BR')}`;
       const num = await registrarComissao({
