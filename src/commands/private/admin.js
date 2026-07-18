@@ -68,11 +68,6 @@ module.exports = {
     )
     .addSubcommand(sub =>
       sub
-        .setName('reset_testes')
-        .setDescription('⚠️ Apaga TUDO: registros, garagens, auditoria e canal. Use só em testes.')
-    )
-    .addSubcommand(sub =>
-      sub
         .setName('sync_911')
         .setDescription('Envia todos os veículos ativos ao 911-bot via canal de integração.')
     )
@@ -196,88 +191,6 @@ module.exports = {
       return interaction.editReply({ content: `🔢 VIN gerado (não reservado): \`${vin}\`` });
     }
 
-    // ── reset_testes ─────────────────────────────────────────────────────────
-    if (sub === 'reset_testes') {
-      await interaction.editReply({ content: '⏳ Iniciando reset completo...' });
-
-      let etapas = [];
-
-      // 1. Limpa DB
-      salvarVeiculos([]);
-      salvarPendentes({});
-      const importsPath = path.join(dbPath, 'imports_processados.json');
-      const pagamentosPath = path.join(dbPath, 'pagamentos_pendentes.json');
-      if (fs.existsSync(importsPath)) fs.writeFileSync(importsPath, '[]');
-      if (fs.existsSync(pagamentosPath)) fs.writeFileSync(pagamentosPath, '[]');
-      etapas.push('✅ Banco de dados limpo (veículos, pendentes, imports, pagamentos)');
-
-      // 2. Limpa canal de registro
-      try {
-        const canalReg = await interaction.client.channels.fetch(canalRegistroVeicularId);
-        let apagadas = 0;
-        while (true) {
-          const msgs = await canalReg.messages.fetch({ limit: 100 });
-          if (msgs.size === 0) break;
-          const proprias = msgs.filter(m => m.author.id === interaction.client.user.id);
-          if (proprias.size === 0) break;
-          for (const m of proprias.values()) {
-            await m.delete().catch(() => {});
-            apagadas++;
-          }
-          if (msgs.size < 100) break;
-        }
-        etapas.push(`✅ Canal de registro limpo (${apagadas} mensagens apagadas)`);
-      } catch (e) {
-        etapas.push(`⚠️ Canal de registro: ${e.message}`);
-      }
-
-      // 3. Limpa canal de auditoria
-      if (canalAuditoriaId) {
-        try {
-          const canalAud = await interaction.client.channels.fetch(canalAuditoriaId);
-          let apagadas = 0;
-          while (true) {
-            const msgs = await canalAud.messages.fetch({ limit: 100 });
-            if (msgs.size === 0) break;
-            const proprias = msgs.filter(m => m.author.id === interaction.client.user.id);
-            if (proprias.size === 0) break;
-            for (const m of proprias.values()) {
-              await m.delete().catch(() => {});
-              apagadas++;
-            }
-            if (msgs.size < 100) break;
-          }
-          etapas.push(`✅ Canal de auditoria limpo (${apagadas} mensagens apagadas)`);
-        } catch (e) {
-          etapas.push(`⚠️ Canal de auditoria: ${e.message}`);
-        }
-      }
-
-      // 4. Limpa canal de integração 911
-      const canal911Id = process.env.CANAL_INTEGRACAO_911_ID;
-      if (canal911Id) {
-        try {
-          const canal911 = await interaction.client.channels.fetch(canal911Id);
-          let apagadas = 0;
-          while (true) {
-            const msgs = await canal911.messages.fetch({ limit: 100 });
-            if (msgs.size === 0) break;
-            const proprias = msgs.filter(m => m.author.id === interaction.client.user.id);
-            if (proprias.size === 0) break;
-            for (const m of proprias.values()) {
-              await m.delete().catch(() => {});
-              apagadas++;
-            }
-            if (msgs.size < 100) break;
-          }
-          etapas.push(`✅ Canal 911 limpo (${apagadas} mensagens apagadas)`);
-        } catch (e) {
-          etapas.push(`⚠️ Canal 911: ${e.message}`);
-        }
-      }
-
-      return interaction.editReply({ content: `## 🧹 Reset concluído\n${etapas.join('\n')}` });
-    }
 
     // ── reset_bonus ──────────────────────────────────────────────────────────
     if (sub === 'reset_bonus') {
