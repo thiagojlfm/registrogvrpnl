@@ -215,24 +215,58 @@ async function _handle(interaction) {
       return;
     }
 
-    // ── Botão: Cotar Seguro (em breve) ───────────────────────────────────────
+    // ── Botão: Cotar Seguro ───────────────────────────────────────────────────
     if (interaction.isButton() && interaction.customId.startsWith('btn_cotar_seguro:')) {
-      return interaction.reply({
-        flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
-        components: [{
-          type: 17,
-          accent_color: cores.azul,
-          components: [
-            {
-              type: 10,
-              content:
-                `## 🛡️ Sistema de Seguros\n` +
-                `> Em breve você poderá cotar e contratar seguros diretamente por aqui.\n` +
-                `-# Aguarde a liberação do sistema.`,
-            },
-          ],
-        }],
-      });
+      const vin = interaction.customId.split(':')[1];
+      const segurosUrl = process.env.SEGUROS_API_URL;
+      const segurosSecret = process.env.SEGUROS_API_SECRET;
+
+      // Se API do seguros não configurada → em breve
+      if (!segurosUrl || !segurosSecret) {
+        return interaction.reply({
+          flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
+          components: [{ type: 17, accent_color: cores.azul, components: [
+            { type: 10, content: `## 🛡️ Sistema de Seguros\n> Em breve você poderá cotar e contratar seguros diretamente por aqui.\n-# Aguarde a liberação do sistema.` },
+          ]}],
+        });
+      }
+
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+      const veiculo = buscarVeiculoPorVin(vin);
+      if (!veiculo) {
+        return interaction.editReply({ content: '❌ Veículo não encontrado.' });
+      }
+
+      try {
+        const res = await fetch(`${segurosUrl.replace(/\/$/, '')}/cotacao/iniciar`, {
+          method: 'POST',
+          headers: { 'x-api-key': segurosSecret, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ discord_id: interaction.user.id, vin: veiculo.vin, placa: veiculo.placa }),
+        });
+
+        if (res.status === 409) {
+          return interaction.editReply({ content: '⚠️ Já existe uma cotação ativa para este veículo. Aguarde as propostas via DM.' });
+        }
+        if (res.status === 503) {
+          return interaction.editReply({ content: '❌ Nenhuma seguradora ativa no momento. Tente mais tarde.' });
+        }
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return interaction.editReply({ content: `❌ Erro ao iniciar cotação: ${err.error ?? res.status}` });
+        }
+
+        const data = await res.json();
+        return interaction.editReply({
+          flags: MessageFlags.IsComponentsV2,
+          components: [{ type: 17, accent_color: cores.verde, components: [
+            { type: 10, content: `## 🛡️ Cotação Iniciada!\n> Sua solicitação para **${veiculo.placa}** foi enviada para **${data.seguradoras}** seguradora(s).\n-# Você receberá as propostas via DM em breve.` },
+          ]}],
+        });
+      } catch (e) {
+        console.error('[DMV][cotar_seguro] Erro ao chamar API seguros:', e.message);
+        return interaction.editReply({ content: '❌ Não foi possível conectar ao sistema de seguros. Tente novamente.' });
+      }
     }
 
     // ── Botão: marcar comissões como pagas ───────────────────────────────────
