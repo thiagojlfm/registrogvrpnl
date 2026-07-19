@@ -71,6 +71,19 @@ function msgRegistroOficial(v) {
   components.push(sep());
 
   // Informações do veículo
+  const seg = v.seguro;
+  const seguroLine = (() => {
+    if (!seg || !seg.ativa || seg.status === 'cancelado') return '';
+    const nome = seg.seguradora_nome ?? seg.seguradora_id ?? 'Seguradora';
+    if (seg.status === 'ativo') {
+      const venc = new Date(seg.vencimento).toLocaleDateString('pt-BR');
+      return `\n-# 🛡️ Segurado — ${nome} · vence ${venc}`;
+    }
+    if (seg.status === 'inadimplente') return `\n-# ⚠️ Seguro inadimplente — ${nome}`;
+    if (seg.status === 'aguardando_pagamento') return `\n-# ⏳ Seguro aguardando pagamento — ${nome}`;
+    return '';
+  })();
+
   components.push(text(
     `## ${info} ${seta} **Informações do veículo**\n` +
     `> ${rpc2} **Ano, marca, modelo:** ${v.veiculo}\n` +
@@ -79,7 +92,8 @@ function msgRegistroOficial(v) {
     `> ${rpw} **Classe:** ${v.classe || 'N/A'}\n` +
     (v.categoria ? `> ${rpw} **Categoria:** ${v.categoria}\n` : '') +
     `> ${rpw} **Placa:** ${v.placa}\n` +
-    `> ${rpc} **VIN Number:** ${v.vin}`
+    `> ${rpc} **VIN Number:** ${v.vin}` +
+    seguroLine
   ));
   components.push(sep());
 
