@@ -18,6 +18,9 @@ for (const arquivo of arquivos) {
 
 client.login(token);
 
+const { iniciarApiServer } = require('./services/apiServer');
+iniciarApiServer();
+
 // Graceful shutdown — aguarda writes pendentes antes de morrer
 process.once('SIGTERM', async () => {
   console.log('[shutdown] SIGTERM recebido — aguardando writes pendentes...');
