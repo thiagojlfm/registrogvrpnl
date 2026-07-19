@@ -88,6 +88,20 @@ function buildCard(veiculos, idx, userId) {
 
   components.push({ type: 1, components: acaoBotoes });
 
+  // Linha 3: status de seguro
+  const seg = v.seguro;
+  let seguroBtn;
+  if (seg?.ativa && seg?.status === 'ativo') {
+    seguroBtn = { type: 2, style: 3, label: '🛡️ Segurado', custom_id: `btn_seguro_info:${v.vin}`, disabled: true };
+  } else if (seg?.status === 'inadimplente') {
+    seguroBtn = { type: 2, style: 4, label: '⚠️ Inadimplente', custom_id: `btn_seguro_info:${v.vin}`, disabled: true };
+  } else if (seg?.status === 'aguardando_pagamento') {
+    seguroBtn = { type: 2, style: 2, label: '⏳ Aguardando Pagamento', custom_id: `btn_seguro_info:${v.vin}`, disabled: true };
+  } else {
+    seguroBtn = { type: 2, style: 2, label: '🛡️ Cotar Seguro', custom_id: `btn_cotar_seguro:${v.vin}` };
+  }
+  components.push({ type: 1, components: [seguroBtn] });
+
   return {
     flags: MessageFlags.IsComponentsV2,
     components: [{

@@ -215,6 +215,26 @@ async function _handle(interaction) {
       return;
     }
 
+    // ── Botão: Cotar Seguro (em breve) ───────────────────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith('btn_cotar_seguro:')) {
+      return interaction.reply({
+        flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
+        components: [{
+          type: 17,
+          accent_color: cores.azul,
+          components: [
+            {
+              type: 10,
+              content:
+                `## 🛡️ Sistema de Seguros\n` +
+                `> Em breve você poderá cotar e contratar seguros diretamente por aqui.\n` +
+                `-# Aguarde a liberação do sistema.`,
+            },
+          ],
+        }],
+      });
+    }
+
     // ── Botão: marcar comissões como pagas ───────────────────────────────────
     if (interaction.isButton() && interaction.customId === 'btn_pagar_comissoes') {
       const { marcarComissoesPagas } = require('../services/database/db');
