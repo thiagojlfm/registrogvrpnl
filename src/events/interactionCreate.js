@@ -330,6 +330,7 @@ async function _handle(interaction) {
         comprador_id: novoId,
         historico_proprietarios: historico,
         comprovante_recompra: comprovante,
+        ex_proprietario_id: exProprietarioId,
       });
 
       // Edita a mensagem de registro original para refletir o novo proprietário

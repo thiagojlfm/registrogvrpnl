@@ -57,6 +57,7 @@ function msgRegistroOficial(v) {
   // totalDonos = 1 (original) + histórico de transferências
   const totalDonos = 1 + historico.length;
   const exPropId = v._ex_proprietario_id
+    || v.ex_proprietario_id
     || (historico.length >= 2 ? historico[historico.length - 2].id : null);
   const exProp = exPropId ? `<@${exPropId}>` : 'N/A';
   const donosLabel = totalDonos === 1
