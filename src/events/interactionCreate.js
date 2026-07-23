@@ -111,6 +111,9 @@ async function _handle(interaction) {
       if (!veiculo || !veiculo.ativo) {
         return interaction.reply({ content: '❌ Veículo não encontrado.', flags: MessageFlags.Ephemeral });
       }
+      if (veiculo.tipo_bonus === 'staff' || veiculo.tipo_bonus === 'boost') {
+        return interaction.reply({ content: `❌ Veículos **${veiculo.tipo_bonus === 'staff' ? 'Staff' : 'Boost'}** não podem ser transferidos.`, flags: MessageFlags.Ephemeral });
+      }
       if (veiculo.comprador_id !== interaction.user.id) {
         return interaction.reply({ content: '❌ Apenas o proprietário registrado pode transferir este veículo.', flags: MessageFlags.Ephemeral });
       }
@@ -315,6 +318,9 @@ async function _handle(interaction) {
 
       if (!veiculo || !veiculo.ativo) {
         return interaction.editReply({ content: '❌ Veículo não encontrado.' });
+      }
+      if (veiculo.tipo_bonus === 'staff' || veiculo.tipo_bonus === 'boost') {
+        return interaction.editReply({ content: `❌ Veículos **${veiculo.tipo_bonus === 'staff' ? 'Staff' : 'Boost'}** não podem ser transferidos.` });
       }
       if (veiculo.comprador_id !== interaction.user.id) {
         return interaction.editReply({ content: '❌ Você não é mais o proprietário registrado deste veículo.' });
