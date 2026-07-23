@@ -1,7 +1,42 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { buscarVeiculosPorProprietario } = require('../../services/database/db');
+const { buscarVeiculosPorProprietario, atualizarVeiculo } = require('../../services/database/db');
 const { cores, emojis: em } = require('../../config/config');
 const { sincronizarCanal } = require('../../utils/syncCanal');
+const { parsearUrlDiscord } = require('../../utils/valorParser');
+
+async function refreshFotos(client, veiculos) {
+  for (const v of veiculos) {
+    if (!v.link_registro) continue;
+    try {
+      const { channelId, messageId } = parsearUrlDiscord(v.link_registro);
+      const canal = await client.channels.fetch(channelId);
+      const msg = await canal.messages.fetch(messageId);
+
+      // Busca imagem: attachment direto ou dentro de media gallery (type 12)
+      let novaUrl = null;
+      const att = msg.attachments?.first();
+      if (att?.contentType?.startsWith('image/')) {
+        novaUrl = att.url;
+      } else {
+        for (const comp of msg.components || []) {
+          const items = comp.components?.flatMap(c => c.items || c.components || []) || comp.items || [];
+          for (const item of items) {
+            const url = item?.media?.url || item?.url;
+            if (url) { novaUrl = url; break; }
+          }
+          if (novaUrl) break;
+        }
+      }
+
+      if (novaUrl && novaUrl !== v.foto_url) {
+        v.foto_url = novaUrl;
+        await atualizarVeiculo(v.vin, { foto_url: novaUrl });
+      }
+    } catch {
+      // silencioso — se falhar, exibe sem foto
+    }
+  }
+}
 
 function buildCard(veiculos, idx, userId) {
   const v = veiculos[idx];
@@ -128,6 +163,8 @@ module.exports = {
       await sincronizarCanal(interaction.client);
       veiculos = buscarVeiculosPorProprietario(interaction.user.id);
     }
+
+    await refreshFotos(interaction.client, veiculos);
 
     if (veiculos.length === 0) {
       return interaction.editReply({
