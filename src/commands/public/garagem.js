@@ -160,7 +160,7 @@ module.exports = {
     // Intro cinematográfica — substitui o "pensando..."
     await interaction.deferReply();
     await interaction.editReply({
-      content: `${GIF_TORETTO}\n### 🔑 Então você quer acelerar?\n-# Abrindo a garagem...`,
+      content: `### 🔑 Então você quer acelerar?\n-# Abrindo a garagem...\n${GIF_TORETTO}`,
     });
 
     // Busca veículos enquanto o gif toca
