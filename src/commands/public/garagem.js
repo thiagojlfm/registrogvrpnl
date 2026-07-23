@@ -155,19 +155,28 @@ module.exports = {
   buildCard,
 
   async execute(interaction) {
+    const GIF_TORETTO = 'https://klipy.com/gifs/domjay-jayblixt-3';
+
+    // Intro cinematográfica — substitui o "pensando..."
     await interaction.deferReply();
+    await interaction.editReply({
+      content: `${GIF_TORETTO}\n### 🔑 Então você quer acelerar?\n-# Abrindo a garagem...`,
+    });
 
+    // Busca veículos enquanto o gif toca
     let veiculos = buscarVeiculosPorProprietario(interaction.user.id);
-
     if (veiculos.length === 0) {
       await sincronizarCanal(interaction.client);
       veiculos = buscarVeiculosPorProprietario(interaction.user.id);
     }
-
     await refreshFotos(interaction.client, veiculos);
+
+    // Aguarda 3s para o gif ter impacto
+    await new Promise(r => setTimeout(r, 3000));
 
     if (veiculos.length === 0) {
       return interaction.editReply({
+        content: '',
         flags: MessageFlags.IsComponentsV2,
         components: [{
           type: 17,
@@ -179,6 +188,6 @@ module.exports = {
       });
     }
 
-    return interaction.editReply(buildCard(veiculos, 0, interaction.user.id));
+    return interaction.editReply({ content: '', ...buildCard(veiculos, 0, interaction.user.id) });
   },
 };
