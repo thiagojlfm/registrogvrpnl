@@ -14,6 +14,7 @@ module.exports = {
   cargoAtendente: process.env.CARGO_ATENDENTE_ID,
   cargoStaff:     process.env.CARGO_STAFF_ID,
   cargoBooster:   process.env.CARGO_BOOSTER_ID,
+  cargoCorrecao:  process.env.CARGO_CORRECAO_ID || '1099870995608780824',
   idBot911: process.env.ID_BOT_911,
   dbPath: process.env.DB_PATH || './data',
 

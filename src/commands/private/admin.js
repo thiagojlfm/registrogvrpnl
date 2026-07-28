@@ -14,7 +14,7 @@ const {
 } = require('../../services/database/db');
 const fs = require('fs');
 const path = require('path');
-const { dbPath, canalAuditoriaId } = require('../../config/config');
+const { dbPath, canalAuditoriaId, cargoCorrecao } = require('../../config/config');
 const { gerarVin } = require('../../utils/vinGenerator');
 const { canalRegistroVeicularId } = require('../../config/config');
 const { msgRegistroOficial } = require('../../utils/formatter');
@@ -226,6 +226,11 @@ module.exports = {
 
     // ── corrigir ─────────────────────────────────────────────────────────────
     if (sub === 'corrigir') {
+      const temPermissao = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)
+        || (cargoCorrecao && interaction.member.roles.cache.has(cargoCorrecao));
+      if (!temPermissao) {
+        return interaction.editReply({ content: '❌ Você não tem permissão para solicitar correções.' });
+      }
       const placa = interaction.options.getString('placa');
       const campo = interaction.options.getString('campo');
       const orientacao = interaction.options.getString('orientacao');
