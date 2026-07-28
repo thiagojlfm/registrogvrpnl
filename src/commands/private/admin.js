@@ -85,6 +85,25 @@ module.exports = {
               { name: 'Staff', value: 'staff' }
             )
         )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('corrigir')
+        .setDescription('Solicita correção de um campo do registro ao dono do veículo.')
+        .addStringOption(o => o.setName('placa').setDescription('Placa do veículo').setRequired(true))
+        .addStringOption(o =>
+          o.setName('campo')
+            .setDescription('Campo a corrigir')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Versão', value: 'modelo' },
+              { name: 'Cor', value: 'cor' },
+              { name: 'Classe', value: 'classe' },
+              { name: 'Placa', value: 'placa' },
+              { name: 'Veículo (marca/ano)', value: 'veiculo' },
+            )
+        )
+        .addStringOption(o => o.setName('orientacao').setDescription('Instrução para o membro').setRequired(true))
     ),
 
   async execute(interaction) {
@@ -203,6 +222,56 @@ module.exports = {
       }
       await removerBonusCooldown(usuario.id, tipo);
       return interaction.editReply({ content: `✅ Cooldown de bônus **${tipo}** resetado para <@${usuario.id}>. Pode usar \`/registro_bonus\` agora.` });
+    }
+
+    // ── corrigir ─────────────────────────────────────────────────────────────
+    if (sub === 'corrigir') {
+      const placa = interaction.options.getString('placa');
+      const campo = interaction.options.getString('campo');
+      const orientacao = interaction.options.getString('orientacao');
+
+      const veiculo = buscarVeiculoPorPlaca(placa);
+      if (!veiculo) return interaction.editReply({ content: `❌ Veículo com placa **${placa}** não encontrado.` });
+
+      const campoLabel = { modelo: 'Versão', cor: 'Cor', classe: 'Classe', placa: 'Placa', veiculo: 'Veículo (marca/ano)' }[campo];
+
+      try {
+        const dono = await interaction.client.users.fetch(veiculo.comprador_id);
+        const dm = await dono.createDM();
+        await dm.send({
+          flags: MessageFlags.IsComponentsV2,
+          components: [{
+            type: 17,
+            accent_color: 0xFEE75C,
+            components: [
+              {
+                type: 10,
+                content:
+                  `## ⚠️ Correção solicitada no seu registro\n` +
+                  `> **Veículo:** ${veiculo.veiculo}${veiculo.modelo ? ` ${veiculo.modelo}` : ''} — \`${veiculo.placa}\`\n` +
+                  `> **Campo:** ${campoLabel}\n` +
+                  `> **Orientação do staff:** ${orientacao}`,
+              },
+              { type: 14, divider: true, spacing: 1 },
+              {
+                type: 1,
+                components: [{
+                  type: 2,
+                  style: 1,
+                  label: '✏️ Corrigir agora',
+                  custom_id: `btn_corrigir:${veiculo.vin}:${campo}`,
+                }],
+              },
+            ],
+          }],
+        });
+      } catch {
+        return interaction.editReply({ content: `❌ Não foi possível enviar DM para <@${veiculo.comprador_id}>. As DMs podem estar fechadas.` });
+      }
+
+      return interaction.editReply({
+        content: `✅ Solicitação de correção enviada para <@${veiculo.comprador_id}>.\n> **Campo:** ${campoLabel}\n> **Orientação:** ${orientacao}`,
+      });
     }
 
     // ── sync_911 ─────────────────────────────────────────────────────────────

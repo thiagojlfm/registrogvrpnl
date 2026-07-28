@@ -272,6 +272,62 @@ async function _handle(interaction) {
       }
     }
 
+    // ── Botão: corrigir campo do registro (via DM) ───────────────────────────
+    if (interaction.isButton() && interaction.customId.startsWith('btn_corrigir:')) {
+      const [, vin, campo] = interaction.customId.split(':');
+      const veiculo = buscarVeiculoPorVin(vin);
+
+      if (!veiculo) return interaction.reply({ content: '❌ Veículo não encontrado.', flags: MessageFlags.Ephemeral });
+      if (veiculo.comprador_id !== interaction.user.id) return interaction.reply({ content: '❌ Este registro não é seu.', flags: MessageFlags.Ephemeral });
+
+      const campoLabel = { modelo: 'Versão', cor: 'Cor', classe: 'Classe', placa: 'Placa', veiculo: 'Veículo (marca/ano)' }[campo] || campo;
+      const valorAtual = veiculo[campo] || '';
+
+      const modal = new ModalBuilder()
+        .setCustomId(`modal_corrigir:${vin}:${campo}`)
+        .setTitle(`Corrigir ${campoLabel}`)
+        .addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('novo_valor')
+              .setLabel(campoLabel)
+              .setPlaceholder(`Valor atual: ${valorAtual || 'N/A'}`)
+              .setValue(valorAtual)
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          )
+        );
+      return interaction.showModal(modal);
+    }
+
+    // ── Modal: salvar correção do registro ───────────────────────────────────
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_corrigir:')) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const [, vin, campo] = interaction.customId.split(':');
+      const novoValor = interaction.fields.getTextInputValue('novo_valor').trim();
+      const veiculo = buscarVeiculoPorVin(vin);
+
+      if (!veiculo) return interaction.editReply({ content: '❌ Veículo não encontrado.' });
+      if (veiculo.comprador_id !== interaction.user.id) return interaction.editReply({ content: '❌ Este registro não é seu.' });
+
+      await atualizarVeiculo(vin, { [campo]: novoValor });
+
+      // Edita mensagem oficial no canal de registro
+      if (veiculo.link_registro) {
+        try {
+          const { channelId, messageId } = parsearUrlDiscord(veiculo.link_registro);
+          const canalReg = await interaction.client.channels.fetch(channelId);
+          const msgReg = await canalReg.messages.fetch(messageId);
+          const { msgRegistroOficial } = require('../utils/formatter');
+          await msgReg.edit(msgRegistroOficial({ ...veiculo, [campo]: novoValor }));
+        } catch (e) {
+          console.error('[corrigir] Erro ao editar registro:', e.message);
+        }
+      }
+
+      return interaction.editReply({ content: `✅ **${campo === 'modelo' ? 'Versão' : campo}** atualizado para: **${novoValor}**\n-# O registro oficial foi atualizado automaticamente.` });
+    }
+
     // ── Botão: marcar comissões como pagas ───────────────────────────────────
     if (interaction.isButton() && interaction.customId === 'btn_pagar_comissoes') {
       const { marcarComissoesPagas } = require('../services/database/db');
