@@ -271,43 +271,28 @@ module.exports = {
           }],
         });
       } catch {
-        // DM fechada — notifica no canal de registro do veículo
-        if (veiculo.link_registro) {
-          try {
-            const { parsearUrlDiscord } = require('../../utils/valorParser');
-            const { channelId, messageId } = parsearUrlDiscord(veiculo.link_registro);
-            const canalReg = await interaction.client.channels.fetch(channelId);
-            await canalReg.send({
-              reply: { messageReference: messageId },
-              content:
-                `<@${veiculo.comprador_id}> ⚠️ **Correção solicitada pelo staff**\n` +
-                `> **Campo:** ${campoLabel}\n` +
-                `> **Orientação:** ${orientacao}\n` +
-                `-# Use \`/admin_veiculo corrigir\` não foi possível te enviar DM — responda aqui abrindo suas DMs e clicando no botão que será enviado.`,
-            });
-            // Tenta DM de aviso simples com o botão
-            try {
-              const dono = await interaction.client.users.fetch(veiculo.comprador_id);
-              const dm = await dono.createDM();
-              await dm.send({
-                flags: MessageFlags.IsComponentsV2,
-                components: [{
-                  type: 17,
-                  accent_color: 0xFEE75C,
-                  components: [
-                    { type: 10, content: `## ⚠️ Correção solicitada no seu registro\n> **Campo:** ${campoLabel}\n> **Orientação:** ${orientacao}` },
-                    { type: 14, divider: true, spacing: 1 },
-                    { type: 1, components: [{ type: 2, style: 1, label: '✏️ Corrigir agora', custom_id: `btn_corrigir:${veiculo.vin}:${campo}` }] },
-                  ],
-                }],
-              });
-            } catch {}
-            return interaction.editReply({ content: `⚠️ DM fechada — mencionei <@${veiculo.comprador_id}> diretamente no registro.\n> **Campo:** ${campoLabel}\n> **Orientação:** ${orientacao}` });
-          } catch {
-            return interaction.editReply({ content: `❌ Não foi possível enviar DM nem notificar no canal. Verifique as permissões do bot no canal de registro.` });
-          }
-        }
-        return interaction.editReply({ content: `❌ DM fechada e veículo sem link de registro. Notifique <@${veiculo.comprador_id}> manualmente.` });
+        // DM fechada — posta no canal onde o staff rodou o comando
+        await interaction.editReply({ content: `⚠️ <@${veiculo.comprador_id}>, sua DM está fechada. Veja a correção solicitada abaixo:` });
+        await interaction.followUp({
+          flags: MessageFlags.IsComponentsV2,
+          components: [{
+            type: 17,
+            accent_color: 0xFEE75C,
+            components: [
+              {
+                type: 10,
+                content:
+                  `## ⚠️ Correção solicitada no seu registro\n` +
+                  `> **Veículo:** ${veiculo.veiculo}${veiculo.modelo ? ` ${veiculo.modelo}` : ''} — \`${veiculo.placa}\`\n` +
+                  `> **Campo:** ${campoLabel}\n` +
+                  `> **Orientação do staff:** ${orientacao}`,
+              },
+              { type: 14, divider: true, spacing: 1 },
+              { type: 1, components: [{ type: 2, style: 1, label: '✏️ Corrigir agora', custom_id: `btn_corrigir:${veiculo.vin}:${campo}` }] },
+            ],
+          }],
+        });
+        return;
       }
 
       return interaction.editReply({
