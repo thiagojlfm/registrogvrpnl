@@ -1,5 +1,5 @@
 const { canalImportacaoId, idBotImportacao, idBotEconomia } = require('../config/config');
-const { lerVeiculos, lerPendentes, setPendente, lerImportsProcessados, marcarImportProcessado } = require('../services/database/db');
+const { lerVeiculos, adicionarPendente, lerImportsProcessados, marcarImportProcessado } = require('../services/database/db');
 const { parsearMensagemImportacao } = require('./parser');
 const { parsearUrlDiscord } = require('./valorParser');
 const { gerarVin } = require('./vinGenerator');
@@ -13,11 +13,7 @@ async function sincronizarImportacoes(client) {
   if (!canal) { console.log(`[sync/import] canal não encontrado`); return 0; }
 
   const veiculos          = lerVeiculos();
-  const pendentes         = lerPendentes();
   const importsProcessados = lerImportsProcessados();
-
-  // Compradores com pendente ativo (aguardando /registrar_veiculo)
-  const compradoresAtivos = new Set(Object.keys(pendentes));
 
   let gerados = 0;
   let before  = undefined;
@@ -47,7 +43,6 @@ async function sincronizarImportacoes(client) {
       const dados = parsearMensagemImportacao(msg);
 
       if (!dados.comprador_id) continue;
-      if (compradoresAtivos.has(dados.comprador_id)) continue;
       if (!dados.comprovante?.trim()) continue;
 
       // Valida comprovante
@@ -62,7 +57,7 @@ async function sincronizarImportacoes(client) {
 
       // Tudo ok — gera VIN, salva pendente e marca import como processado
       const vin = gerarVin();
-      await setPendente(dados.comprador_id, {
+      await adicionarPendente(dados.comprador_id, {
         vin,
         importador_id: dados.importador_id || null,
         veiculo:      dados.veiculo  || 'Desconhecido',
@@ -74,7 +69,6 @@ async function sincronizarImportacoes(client) {
       });
       await marcarImportProcessado(msg.id);
 
-      compradoresAtivos.add(dados.comprador_id);
       gerados++;
 
       // Notifica no tópico da conce (channelId do comprovante = thread onde o !pay foi feito)

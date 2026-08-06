@@ -254,6 +254,7 @@ async function recuperarPendentes(client) {
   const pendentesAtuais = lerPendentes();
   const veiculos = lerVeiculos();
   const vinsRegistrados = new Set(veiculos.map(v => v.vin));
+  const vinsPendentesExistentes = new Set(Object.values(pendentesAtuais).flat().map(p => p.vin));
   const LIMITE_MS = 24 * 60 * 60 * 1000;
   const agora = Date.now();
   let recuperados = 0;
@@ -273,9 +274,11 @@ async function recuperarPendentes(client) {
           const dados = JSON.parse(match[1]);
           const { comprador_id, vin, criado_em, ...resto } = dados;
           if (vinsRegistrados.has(vin)) continue;
-          if (pendentesAtuais[comprador_id]?.vin === vin) continue;
+          if (vinsPendentesExistentes.has(vin)) continue;
           if (criado_em && (agora - criado_em) > LIMITE_MS) continue;
-          pendentesAtuais[comprador_id] = { vin, criado_em, ...resto };
+          if (!pendentesAtuais[comprador_id]) pendentesAtuais[comprador_id] = [];
+          pendentesAtuais[comprador_id].push({ vin, criado_em, ...resto });
+          vinsPendentesExistentes.add(vin);
           recuperados++;
         } catch {}
       }
@@ -307,7 +310,7 @@ async function recuperarPendentes(client) {
             const vin = vinMatch[1];
 
             if (vinsRegistrados.has(vin)) continue;
-            if (pendentesAtuais[comprador_id]?.vin === vin) continue;
+            if (vinsPendentesExistentes.has(vin)) continue;
 
             // Extrai dados básicos do texto para recriar o pendente mínimo
             const veiculoMatch = texto.match(/Veículo[:\s]+(.+?)(?:\n|$)/);
@@ -316,7 +319,8 @@ async function recuperarPendentes(client) {
             const comprovanteMatch = texto.match(/[Cc]omprovante[^\n]*(https:\/\/discord\.com\/\S+)/);
             const comprovanteUrl = comprovanteMatch ? comprovanteMatch[1] : null;
 
-            pendentesAtuais[comprador_id] = {
+            if (!pendentesAtuais[comprador_id]) pendentesAtuais[comprador_id] = [];
+            pendentesAtuais[comprador_id].push({
               vin,
               importador_id: null,
               veiculo: veiculoTexto,
@@ -327,7 +331,8 @@ async function recuperarPendentes(client) {
               comprovante: comprovanteUrl,
               valor_pago: null,
               criado_em: msg.createdTimestamp,
-            };
+            });
+            vinsPendentesExistentes.add(vin);
             recuperados++;
             console.log(`[sync] Pendente recuperado via thread para <@${comprador_id}> VIN ${vin}`);
           }

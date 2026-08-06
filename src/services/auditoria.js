@@ -325,8 +325,9 @@ async function reconstruirDoCanal(client) {
     todasMsgs.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
 
     const veiculosMap = new Map();   // vin → objeto
-    const pendentesMap = {};         // comprador_id → pendente
+    const pendentesMap = {};         // comprador_id → array de pendentes
     const vinsRegistrados = new Set();
+    const vinsPendentes = new Set();
 
     for (const msg of todasMsgs) {
       if (msg.author.id !== client.user.id) continue;
@@ -357,9 +358,11 @@ async function reconstruirDoCanal(client) {
       }
 
       if (tipo === 'PENDENTE' && dados.comprador_id) {
-        if (!vinsRegistrados.has(dados.vin)) {
+        if (!vinsRegistrados.has(dados.vin) && !vinsPendentes.has(dados.vin)) {
           const { comprador_id, ...resto } = dados;
-          pendentesMap[comprador_id] = resto;
+          if (!pendentesMap[comprador_id]) pendentesMap[comprador_id] = [];
+          pendentesMap[comprador_id].push(resto);
+          vinsPendentes.add(dados.vin);
         }
       }
     }
@@ -372,9 +375,11 @@ async function reconstruirDoCanal(client) {
     }
 
     let pendentesSalvos = 0;
-    for (const [comprador_id, pendente] of Object.entries(pendentesMap)) {
-      await db.setPendente(comprador_id, pendente);
-      pendentesSalvos++;
+    for (const [comprador_id, lista] of Object.entries(pendentesMap)) {
+      for (const pendente of lista) {
+        await db.adicionarPendente(comprador_id, pendente);
+        pendentesSalvos++;
+      }
     }
 
     console.log(`[recovery] Reconstruído: ${veiculosSalvos} veículo(s), ${pendentesSalvos} pendente(s).`);

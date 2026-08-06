@@ -15,7 +15,7 @@ function vinJaExiste(vin) {
   if (veiculos.some(v => v.vin === vin)) return true;
 
   const pendentes = lerPendentes();
-  return Object.values(pendentes).some(p => p.vin === vin);
+  return Object.values(pendentes).flat().some(p => p.vin === vin);
 }
 
 function gerarVin() {

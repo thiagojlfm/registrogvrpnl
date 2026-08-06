@@ -1,7 +1,7 @@
 const { idBotImportacao, idBotEconomia, canalImportacaoId } = require('../config/config');
 const { parsearMensagemImportacao } = require('../utils/parser');
 const { gerarVin } = require('../utils/vinGenerator');
-const { setPendente, marcarImportProcessado } = require('../services/database/db');
+const { adicionarPendente, marcarImportProcessado, lerImportsProcessados } = require('../services/database/db');
 const { msgImportacaoRegistrada } = require('../utils/formatter');
 const { parsearUrlDiscord } = require('../utils/valorParser');
 
@@ -10,6 +10,9 @@ module.exports = {
   async execute(message) {
     if (message.author.id !== idBotImportacao) return;
     if (message.channelId !== canalImportacaoId) return;
+
+    // Idempotência — evita duplicar pendente se o evento disparar mais de uma vez
+    if (lerImportsProcessados().has(message.id)) return;
 
     const dados = parsearMensagemImportacao(message);
 
@@ -50,7 +53,7 @@ module.exports = {
       return;
     }
 
-    setPendente(dados.comprador_id, {
+    adicionarPendente(dados.comprador_id, {
       vin,
       importador_id: dados.importador_id || null,
       veiculo: dados.veiculo || 'Desconhecido',

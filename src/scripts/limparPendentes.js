@@ -14,12 +14,17 @@ const agora = Date.now();
 const pendentes = lerPendentes();
 let removidos = 0;
 
-for (const [id, p] of Object.entries(pendentes)) {
-  if (agora - p.criado_em > limiteMs) {
-    delete pendentes[id];
-    removidos++;
-    console.log(`Removido pendente de ${id} (VIN: ${p.vin}) — criado há ${Math.round((agora - p.criado_em) / 3600000)}h`);
-  }
+for (const [id, lista] of Object.entries(pendentes)) {
+  const restantes = lista.filter(p => {
+    const expirado = agora - p.criado_em > limiteMs;
+    if (expirado) {
+      removidos++;
+      console.log(`Removido pendente de ${id} (VIN: ${p.vin}) — criado há ${Math.round((agora - p.criado_em) / 3600000)}h`);
+    }
+    return !expirado;
+  });
+  if (restantes.length > 0) pendentes[id] = restantes;
+  else delete pendentes[id];
 }
 
 salvarPendentes(pendentes);

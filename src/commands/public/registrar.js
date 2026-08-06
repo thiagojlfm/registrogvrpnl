@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { canalRegistroVeicularId } = require('../../config/config');
-const { getPendente, removerPendente, adicionarVeiculo, atualizarVeiculo } = require('../../services/database/db');
+const { listarPendentes, removerPendente, adicionarVeiculo, atualizarVeiculo } = require('../../services/database/db');
 const { msgRegistroOficial } = require('../../utils/formatter');
 const { notificar911 } = require('../../services/notificar911');
 const { logRegistro } = require('../../services/auditoria');
@@ -49,15 +49,35 @@ module.exports = {
     )
     .addStringOption(o =>
       o.setName('finalidade').setDescription('Finalidade da empresa (se empresarial)').setRequired(false)
+    )
+    .addStringOption(o =>
+      o.setName('vin').setDescription('VIN do pendente a registrar (se você tiver mais de uma compra pendente)').setRequired(false)
     ),
 
   async execute(interaction) {
     await interaction.deferReply();
 
-    const pendente = getPendente(interaction.user.id);
-    if (!pendente) {
+    const pendentes = listarPendentes(interaction.user.id);
+    if (pendentes.length === 0) {
       return interaction.editReply({
         content: '❌ Nenhuma venda ou importação pendente encontrada para o seu usuário.\nAguarde a autorização do atendente ou a confirmação da importação.',
+      });
+    }
+
+    const vinOption = interaction.options.getString('vin');
+    let pendente;
+    if (pendentes.length === 1) {
+      pendente = pendentes[0];
+    } else if (vinOption) {
+      pendente = pendentes.find(p => p.vin === vinOption);
+      if (!pendente) {
+        const lista = pendentes.map(p => `• \`${p.vin}\` — ${p.veiculo}${p.modelo ? ` ${p.modelo}` : ''}`).join('\n');
+        return interaction.editReply({ content: `❌ VIN não encontrado entre seus pendentes:\n${lista}` });
+      }
+    } else {
+      const lista = pendentes.map(p => `• \`${p.vin}\` — ${p.veiculo}${p.modelo ? ` ${p.modelo}` : ''}`).join('\n');
+      return interaction.editReply({
+        content: `⚠️ Você tem **${pendentes.length}** compras pendentes de registro. Informe qual usando a opção **vin**:\n${lista}`,
       });
     }
 
@@ -108,7 +128,7 @@ module.exports = {
 
     const linkRegistro = `https://discord.com/channels/${interaction.guildId}/${canal.id}/${msgPublicada.id}`;
     await adicionarVeiculo({ ...veiculo, link_registro: linkRegistro });
-    await removerPendente(interaction.user.id);
+    await removerPendente(interaction.user.id, pendente.vin);
 
     await logRegistro(interaction.client, {
 

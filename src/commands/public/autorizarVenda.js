@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { idBotEconomia, cargoAtendente, cores, canalConceOffsaleId, canalConceLimitedId } = require('../../config/config');
-const { setPendente, getCotacao, registrarComissao } = require('../../services/database/db');
+const { adicionarPendente, listarPendentes, getCotacao, registrarComissao } = require('../../services/database/db');
 const { gerarVin } = require('../../utils/vinGenerator');
 const { extrairValorEmbed, normalizarValor } = require('../../utils/valorParser');
 const { logPendente, logComissao } = require('../../services/auditoria');
@@ -163,14 +163,26 @@ async function _executarAutorizacao(interaction, comprador, topico) {
       });
     }
 
+    // Trava: já existe um pendente ativo para este comprador neste mesmo tópico?
+    // Evita reautorização acidental gerar VIN e comissão duplicados.
+    const pendenteMesmoTopico = listarPendentes(comprador.id).find(p => p.topico_id === topico.id);
+    if (pendenteMesmoTopico) {
+      return interaction.editReply({
+        content:
+          `⚠️ Já existe uma autorização pendente para <@${comprador.id}> neste tópico (VIN: \`${pendenteMesmoTopico.vin}\`).\n` +
+          `Aguarde o comprador usar **/registrar_veiculo**, ou use **/admin_veiculo limpar_pendente** para cancelar antes de reautorizar.`,
+      });
+    }
+
     // Gera VIN
     let vin;
     try { vin = gerarVin(); } catch (err) {
       return interaction.editReply({ content: '❌ Erro ao gerar VIN. Tente novamente.' });
     }
 
-    setPendente(comprador.id, {
+    adicionarPendente(comprador.id, {
       vin,
+      topico_id: topico.id,
       importador_id: interaction.user.id,
       veiculo: veiculoNome,
       modelo: modeloNome,
@@ -219,6 +231,7 @@ async function _executarAutorizacao(interaction, comprador, topico) {
       comprador_id: comprador.id,
       pendente: {
         vin,
+        topico_id: topico.id,
         importador_id: interaction.user.id,
         veiculo: veiculoNome,
         modelo: modeloNome,

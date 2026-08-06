@@ -147,6 +147,8 @@ function substituirVeiculoBonus(discordId, tipo, novoVeiculo) {
 }
 
 // ── Pendentes ─────────────────────────────────────────────────────────────────
+// Cada usuário pode ter MÚLTIPLOS pendentes simultâneos (compras/importações
+// aguardando /registrar_veiculo). Estrutura: { discordId: [pendente, pendente, ...] }
 
 function lerPendentes() {
   return safeRead(pendentesPath, {});
@@ -156,23 +158,48 @@ function salvarPendentes(pendentes) {
   safeWrite(pendentesPath, pendentes);
 }
 
-function getPendente(discordId) {
-  return lerPendentes()[discordId] || null;
+// Lista todos os pendentes de um usuário (array, vazio se nenhum)
+function listarPendentes(discordId) {
+  const pendentes = lerPendentes();
+  return pendentes[discordId] || [];
 }
 
-function setPendente(discordId, dados) {
+// Compat: retorna o pendente mais recente do usuário (uso apenas quando há garantia de 1 só)
+function getPendente(discordId) {
+  const lista = listarPendentes(discordId);
+  return lista.length ? lista[lista.length - 1] : null;
+}
+
+// Busca um pendente específico do usuário pelo VIN
+function getPendentePorVin(discordId, vin) {
+  return listarPendentes(discordId).find(p => p.vin === vin) || null;
+}
+
+// Adiciona um novo pendente à lista do usuário — NUNCA sobrescreve outros pendentes
+function adicionarPendente(discordId, dados) {
   return withLock(pendentesPath, () => {
     const pendentes = lerPendentes();
-    pendentes[discordId] = dados;
+    if (!pendentes[discordId]) pendentes[discordId] = [];
+    if (!pendentes[discordId].some(p => p.vin === dados.vin)) {
+      pendentes[discordId].push(dados);
+    }
     salvarPendentes(pendentes);
   });
 }
 
-function removerPendente(discordId) {
+// Remove um pendente específico pelo VIN. Sem VIN, remove TODOS os pendentes do usuário.
+function removerPendente(discordId, vin) {
   return withLock(pendentesPath, () => {
     const pendentes = lerPendentes();
-    delete pendentes[discordId];
+    if (!pendentes[discordId]) return 0;
+    const antes = pendentes[discordId].length;
+    pendentes[discordId] = vin
+      ? pendentes[discordId].filter(p => p.vin !== vin)
+      : [];
+    const removidos = antes - pendentes[discordId].length;
+    if (pendentes[discordId].length === 0) delete pendentes[discordId];
     salvarPendentes(pendentes);
+    return removidos;
   });
 }
 
@@ -334,8 +361,10 @@ module.exports = {
   atualizarVeiculo,
   removerVeiculo,
   substituirVeiculoBonus,
+  listarPendentes,
   getPendente,
-  setPendente,
+  getPendentePorVin,
+  adicionarPendente,
   removerPendente,
   lerPagamentos,
   adicionarPagamento,

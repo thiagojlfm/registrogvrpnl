@@ -4,7 +4,7 @@ const {
   buscarVeiculoPorVin,
   atualizarVeiculo,
   removerVeiculo,
-  getPendente,
+  listarPendentes,
   removerPendente,
   adicionarVeiculo,
   salvarVeiculos,
@@ -40,6 +40,7 @@ module.exports = {
               { name: 'Empresarial', value: 'empresarial' }
             )
         )
+        .addStringOption(o => o.setName('vin').setDescription('VIN específico (se o usuário tiver múltiplos pendentes)').setRequired(false))
     )
     .addSubcommand(sub =>
       sub
@@ -58,8 +59,9 @@ module.exports = {
     .addSubcommand(sub =>
       sub
         .setName('limpar_pendente')
-        .setDescription('Remove a importação pendente de um usuário.')
+        .setDescription('Remove a(s) importação(ões) pendente(s) de um usuário.')
         .addUserOption(o => o.setName('usuario').setDescription('Usuário').setRequired(true))
+        .addStringOption(o => o.setName('vin').setDescription('VIN específico a remover (vazio remove todos os pendentes do usuário)').setRequired(false))
     )
     .addSubcommand(sub =>
       sub
@@ -117,10 +119,25 @@ module.exports = {
       const placa = interaction.options.getString('placa');
       const cor = interaction.options.getString('cor');
       const tipo = interaction.options.getString('tipo');
+      const vinOption = interaction.options.getString('vin');
 
-      const pendente = getPendente(usuario.id);
-      if (!pendente) {
+      const pendentesUsuario = listarPendentes(usuario.id);
+      if (pendentesUsuario.length === 0) {
         return interaction.editReply({ content: `❌ Nenhuma importação pendente para <@${usuario.id}>.` });
+      }
+
+      let pendente;
+      if (pendentesUsuario.length === 1) {
+        pendente = pendentesUsuario[0];
+      } else if (vinOption) {
+        pendente = pendentesUsuario.find(p => p.vin === vinOption);
+        if (!pendente) {
+          const lista = pendentesUsuario.map(p => `• \`${p.vin}\` — ${p.veiculo}${p.modelo ? ` ${p.modelo}` : ''}`).join('\n');
+          return interaction.editReply({ content: `❌ VIN não encontrado entre os pendentes de <@${usuario.id}>:\n${lista}` });
+        }
+      } else {
+        const lista = pendentesUsuario.map(p => `• \`${p.vin}\` — ${p.veiculo}${p.modelo ? ` ${p.modelo}` : ''}`).join('\n');
+        return interaction.editReply({ content: `⚠️ <@${usuario.id}> tem **${pendentesUsuario.length}** pendentes. Informe qual usando a opção **vin**:\n${lista}` });
       }
 
       const agora = Date.now();
@@ -147,7 +164,7 @@ module.exports = {
       };
 
       await adicionarVeiculo(veiculo);
-      await removerPendente(usuario.id);
+      await removerPendente(usuario.id, pendente.vin);
 
       const canal = await interaction.client.channels.fetch(canalRegistroVeicularId);
       const msgPublicada = await canal.send(msgRegistroOficial(veiculo));
@@ -196,12 +213,24 @@ module.exports = {
     // ── limpar_pendente ──────────────────────────────────────────────────────
     if (sub === 'limpar_pendente') {
       const usuario = interaction.options.getUser('usuario');
-      const pendente = getPendente(usuario.id);
-      if (!pendente) {
+      const vinOption = interaction.options.getString('vin');
+      const pendentesUsuario = listarPendentes(usuario.id);
+      if (pendentesUsuario.length === 0) {
         return interaction.editReply({ content: `❌ Nenhum pendente encontrado para <@${usuario.id}>.` });
       }
+
+      if (vinOption) {
+        const alvo = pendentesUsuario.find(p => p.vin === vinOption);
+        if (!alvo) {
+          return interaction.editReply({ content: `❌ VIN \`${vinOption}\` não encontrado entre os pendentes de <@${usuario.id}>.` });
+        }
+        await removerPendente(usuario.id, vinOption);
+        return interaction.editReply({ content: `✅ Pendente de <@${usuario.id}> removido (VIN: ${vinOption}).` });
+      }
+
       await removerPendente(usuario.id);
-      return interaction.editReply({ content: `✅ Pendente de <@${usuario.id}> removido (VIN: ${pendente.vin}).` });
+      const vins = pendentesUsuario.map(p => `\`${p.vin}\``).join(', ');
+      return interaction.editReply({ content: `✅ **${pendentesUsuario.length}** pendente(s) de <@${usuario.id}> removido(s): ${vins}.` });
     }
 
     // ── gerar_vin ────────────────────────────────────────────────────────────
