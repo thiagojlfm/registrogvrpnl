@@ -78,7 +78,7 @@ function msgRegistroOficial(v) {
     const nome = seg.seguradora_nome ?? seg.seguradora_id ?? 'Seguradora';
     if (seg.status === 'ativo') {
       const venc = new Date(seg.vencimento).toLocaleDateString('pt-BR');
-      return `\n-# 🛡️ Segurado — ${nome} · vence ${venc}`;
+      return `\n-# <:Carsafetygvnl:1527466896079847544> Segurado — ${nome} · vence ${venc}`;
     }
     if (seg.status === 'inadimplente') return `\n-# ⚠️ Seguro inadimplente — ${nome}`;
     if (seg.status === 'aguardando_pagamento') return `\n-# ⏳ Seguro aguardando pagamento — ${nome}`;

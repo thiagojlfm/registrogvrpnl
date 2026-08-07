@@ -229,7 +229,7 @@ async function _handle(interaction) {
         return interaction.reply({
           flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
           components: [{ type: 17, accent_color: cores.azul, components: [
-            { type: 10, content: `## 🛡️ Sistema de Seguros\n> Em breve você poderá cotar e contratar seguros diretamente por aqui.\n-# Aguarde a liberação do sistema.` },
+            { type: 10, content: `## <:Carsafetygvnl:1527466896079847544> Sistema de Seguros\n> Em breve você poderá cotar e contratar seguros diretamente por aqui.\n-# Aguarde a liberação do sistema.` },
           ]}],
         });
       }
@@ -263,7 +263,7 @@ async function _handle(interaction) {
         return interaction.editReply({
           flags: MessageFlags.IsComponentsV2,
           components: [{ type: 17, accent_color: cores.verde, components: [
-            { type: 10, content: `## 🛡️ Cotação Iniciada!\n> Sua solicitação para **${veiculo.placa}** foi enviada para **${data.seguradoras}** seguradora(s).\n-# Você receberá as propostas via DM em breve.` },
+            { type: 10, content: `## <:Carsafetygvnl:1527466896079847544> Cotação Iniciada!\n> Sua solicitação para **${veiculo.placa}** foi enviada para **${data.seguradoras}** seguradora(s).\n-# Você receberá as propostas via DM em breve.` },
           ]}],
         });
       } catch (e) {
