@@ -263,7 +263,7 @@ async function _handle(interaction) {
         return interaction.editReply({
           flags: MessageFlags.IsComponentsV2,
           components: [{ type: 17, accent_color: cores.verde, components: [
-            { type: 10, content: `## <:Carsafetygvnl:1527466896079847544> Cotação Iniciada!\n> Sua solicitação para **${veiculo.placa}** foi enviada para **${data.seguradoras}** seguradora(s).\n-# Você receberá as propostas via DM em breve.` },
+            { type: 10, content: `## <:Carsafetygvnl:1527466896079847544> Cotação Iniciada!\n> Sua solicitação para **${veiculo.veiculo ?? veiculo.modelo ?? 'veículo'}** (\`${veiculo.placa}\`) foi enviada para **${data.seguradoras}** seguradora(s).\n-# Você receberá as propostas via DM em breve.` },
           ]}],
         });
       } catch (e) {
