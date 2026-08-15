@@ -5,7 +5,7 @@ const { gerarVin } = require('../../utils/vinGenerator');
 const { extrairValorEmbed, normalizarValor } = require('../../utils/valorParser');
 const { logPendente, logComissao } = require('../../services/auditoria');
 
-const DOIS_HORAS_MS = 2 * 60 * 60 * 1000;
+const DOZE_HORAS_MS = 12 * 60 * 60 * 1000;
 
 // Mutex por tópico — impede dupla autorização simultânea
 const autorizacoesEmAndamento = new Set();
@@ -85,10 +85,10 @@ async function _executarAutorizacao(interaction, comprador, topico) {
       // Mesmo comprador → re-autorização, continua normalmente
     }
 
-    // Foca no !pay: busca o !pay mais recente nas mensagens do tópico (últimas 2h)
+    // Foca no !pay: busca o !pay mais recente nas mensagens do tópico (últimas 12h)
     const msgPayCmd = [...todasMensagens].reverse().find(m => {
       if (m.author.bot) return false;
-      if ((agora - m.createdTimestamp) > DOIS_HORAS_MS) return false;
+      if ((agora - m.createdTimestamp) > DOZE_HORAS_MS) return false;
       return /^!pay\s+/i.test(m.content);
     });
 
@@ -97,14 +97,14 @@ async function _executarAutorizacao(interaction, comprador, topico) {
     const msgPagamento = todasMensagens.find(m => {
       if (m.author.id !== idBotEconomia) return false;
       if (m.createdTimestamp < timestampPay) return false;
-      if ((agora - m.createdTimestamp) > DOIS_HORAS_MS) return false;
+      if ((agora - m.createdTimestamp) > DOZE_HORAS_MS) return false;
       const textoEmbed = m.embeds?.[0]?.description || m.embeds?.[0]?.title || '';
       return textoEmbed.includes('has received');
     });
 
     if (!msgPagamento) {
       return interaction.editReply({
-        content: '❌ Nenhuma confirmação de pagamento (`!pay`) encontrada neste tópico nas últimas 2 horas.',
+        content: '❌ Nenhuma confirmação de pagamento (`!pay`) encontrada neste tópico nas últimas 12 horas.',
       });
     }
 
